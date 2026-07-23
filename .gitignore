@@ -1,26 +1,65 @@
 # Ignore all zip archives
 *.zip
 
-# Laravel defaults
+# Dependencies (install on server with composer / npm ? never commit)
 /vendor/
 /node_modules/
-/storage/framework/cache/
-/storage/framework/sessions/
-/storage/framework/views/
-/storage/logs/
 
-# Environment files
+# Environment & secrets
 .env
 .env.*
+!.env.example
+**/credentials.json
 
-# Local backup dump — do not commit
+# Laravel storage runtime (uploads, cache, logs, sessions)
+/storage/app/*
+!/storage/app/.gitignore
+!/storage/app/public/
+/storage/app/public/*
+!/storage/app/public/.gitignore
+/storage/framework/cache/
+/storage/framework/sessions/
+/storage/framework/testing/
+/storage/framework/views/
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/*.sql
+/storage/app.sql
+/storage/candidates/
+/storage/skills.php
+/storage/debugbar/
+/storage/oauth-*.key
+/storage/firebase_credentials.json
+
+# Local / server dumps ? do not commit
 storage_old/
-public/debug.php
-public/opcache.php
-public/error_log
-public/test.php
+*.tar.gz
 
+# Bootstrap compiled cache (regenerated on server)
+/bootstrap/cache/*.php
+!/bootstrap/cache/.gitignore
+
+# Public junk / debug / logs
+/public/hot
+/public/storage
+/public/error_log
+/public/debug.php
+/public/opcache.php
+/public/test.php
+/public/uploads/
+error_log
 
 # Too large for GitHub (>100MB); use cities.json.gz
 resources/seed-data/cities.json
 
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.bak
+.htaccess.bak
+login_ui.html
+
+# Build artifacts that change per machine (keep manifest if needed)
+# /public/build/   # uncomment if you build assets on the server only
