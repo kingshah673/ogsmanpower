@@ -14,6 +14,7 @@ class CreateCitiesTable extends Migration
      */
     public function up()
     {
+        if (Schema::hasTable('cities')) { Artisan::call('db:seed --class=CitySeeder --force'); return; }
         Schema::create('cities', function (Blueprint $table) {
             $table->id();
             $table->string('name', 255);

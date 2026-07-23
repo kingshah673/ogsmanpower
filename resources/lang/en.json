@@ -1609,31 +1609,7 @@
     "sign_up": "Sign Up",
     "featured_candidates": "Featured Candidates",
     "enabled": "Enabled",
-    "disabled": "Disabled"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    "disabled": "Disabled",
+    "you_are_registering_as": "You are registering as",
+    "change_role": "Change role"
 }

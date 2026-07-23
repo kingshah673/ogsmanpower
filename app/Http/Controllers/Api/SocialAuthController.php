@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Candidate\CandidateResource;
 use App\Http\Resources\Company\CompanyResource;
+use App\Http\Resources\Agency\AgencyResource;
 use App\Models\User;
 use Firebase\Auth\Token\Exception\InvalidToken;
 use Illuminate\Http\Request;
@@ -19,8 +20,12 @@ class SocialAuthController extends Controller
 
     public function __construct()
     {
-        $this->factory = (new Factory)->withServiceAccount(storage_path('firebase_credentials.json'));
-        $this->auth = $this->factory->createAuth();
+        try {
+            $this->factory = (new Factory)->withServiceAccount(storage_path('firebase_credentials.json'));
+            $this->auth = $this->factory->createAuth();
+        } catch (\Throwable $e) {
+            \Log::warning('Firebase credentials not available: ' . $e->getMessage());
+        }
     }
 
     public function socialAuthentication(Request $request)
@@ -84,9 +89,16 @@ class SocialAuthController extends Controller
                 } elseif ($request->actionKey == 'registration') {
 
                     if ($request->has('role')) {
-                        $user = User::create([
+                        $allowedRoles = ['candidate', 'company'];
+                    $requestedRole = $request->input('role');
+                    if (!in_array($requestedRole, $allowedRoles, true)) {
+                        return response()->json([
+                            'data' => ['message' => 'Invalid role specified'],
+                        ], 422);
+                    }
+                    $user = User::create([
                             'firebase_uid' => $uid,
-                            'role' => $request->input('role'),
+                            'role' => $requestedRole,
                             'name' => $verifiedIdToken->claims()->get('name'),
                             'email' => $verifiedIdToken->claims()->get('email'),
                         ]);

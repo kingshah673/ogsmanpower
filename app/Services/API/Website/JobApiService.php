@@ -164,7 +164,7 @@ class JobApiService
 
         // Job type filter
         if ($request->has('job_type') && $request->job_type != null) {
-            $job_type_id = JobType::where('name', $request->job_type)->value('id');
+            $job_type_id = JobType::whereTranslation('name', $request->job_type)->value('id');
             $query->where('job_type_id', $job_type_id);
         }
 

@@ -24,12 +24,15 @@ class HasPlanMiddleware
 
         if (auth('user')->check() && authUser() && authUser()->role == 'company') {
 
-            if ($path == '/register') {  // from register page . redirect for account complete page first
-                return redirect()->route('company.account-progress');
+            $company = authUser()->company;
+            $documentRedirect = \App\Services\Company\CompanyDocumentVerificationService::redirectIfBlocked($company);
+            if ($documentRedirect) {
+                return $documentRedirect;
             }
 
-            $user = Auth::user();
-            $company = $user->company;
+            if ($path == '/register') {
+                return redirect()->route('company.verify.documents.index');
+            }
             $plan = $company->userPlan;
             if (! $plan) {
 
@@ -50,17 +53,59 @@ class HasPlanMiddleware
                 return $next($request);
             }
         }
+        elseif (auth('user')->check() && authUser() && authUser()->role == 'agency') {
+
+            if ($path == '/register') {  // from register page . redirect for account complete page first
+                return redirect()->route('agency.account-progress');
+            }
+
+            $user = Auth::user();
+            $agency = $user->agency;
+            $plan = $agency->userPlan;
+            if (! $plan) {
+
+                // check agency have any pending order
+                $check_pending_plan = $this->checkAgencyPendingPlan($agency);
+
+                $have_any_session = session()->get('success');
+                if ($have_any_session) {
+                    flashSuccess($have_any_session);
+                } elseif ($check_pending_plan) {
+                    flashWarning(__('your_purchased_plan_order_has_pending._please_wait_until_the_order_is_approved'));
+                } else {
+                    flashWarning(__('you_dont_have_a_chosen_plan_please_choose_a_plan_to_continue'));
+                }
+
+                return redirect()->route('website.plan');
+            } else {
+                return $next($request);
+            }
+        }
 
         return $next($request);
     }
 
+
     public function checkPendingPlan(object $company): bool
     {
         $earnings = Earning::where('company_id', $company->id)->where('payment_status', 'unpaid')->first();
+       
         if ($earnings) {
             return true;
         } else {
             return false;
         }
+       
     }
+    public function checkAgencyPendingPlan(object $agency): bool
+    {
+        $earnings2 = Earning::where('agency_id', $agency->id)->where('payment_status', 'unpaid')->first();
+        if ($earnings2) {
+            return true;
+        } else {
+            return false;
+        }
+       
+    }
+    
 }

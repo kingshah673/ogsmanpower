@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
+use App\Models\Agency;
 
 class Job extends Model
 {
@@ -109,6 +110,35 @@ class Job extends Model
 
         return false;
     }
+public function agencies()
+{
+    return $this->belongsToMany(
+        \App\Models\Agency::class,
+        'job_agencies',
+        'job_id',
+        'agency_id'
+    )->withPivot(['status', 'decline_reason', 'responded_at'])->withTimestamps();
+}
+public function subAgencies()
+{
+    return $this->belongsToMany(
+        \App\Models\Agency::class,
+        'job_sub_agencies',
+        'job_id',
+        'sub_agency_id'
+    );
+}
+
+public function agents()
+{
+    return $this->belongsToMany(
+        \App\Models\User::class,
+        'job_agents',
+        'job_id',
+        'agent_id'
+    );
+}
+
 
     /**
      * Get the job's full address.
@@ -147,6 +177,10 @@ class Job extends Model
             return false;
         }
     }
+    public function assignments()
+{
+    return $this->hasMany(JobAssignment::class);
+}
 
     /**
      * Get the deadline active attribute
@@ -229,13 +263,96 @@ class Job extends Model
     }
 
     /**
-     * Get the company jobs scope
+     * Jobs that should appear on the public /jobs listing.
+     * Employer direct posts may have a null job_roles value; agency/admin posts use CSV roles.
+     */
+    public function scopePublicListing($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('job_roles')
+                ->orWhere('job_roles', '')
+                ->orWhereRaw("FIND_IN_SET('public', job_roles)");
+        });
+    }
+
+    /**
+     * Restrict listings for a seeker to jobs without an age gate, or jobs whose min/max age includes $age.
+     * Age gate is only when age_limit is enabled (matches job eligibility / apply rules).
+     * When $age is null, age-gated jobs are hidden.
+     */
+    public function scopeMatchingCandidateAge($query, ?int $age)
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn($this->getTable(), 'age_limit')) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($age) {
+            // Jobs that do not enforce age
+            $q->where(function ($open) {
+                $open->whereNull('age_limit')->orWhere('age_limit', 0);
+            });
+
+            if ($age === null) {
+                return;
+            }
+
+            // Age-gated jobs the seeker qualifies for
+            $q->orWhere(function ($fit) use ($age) {
+                $fit->where('age_limit', 1)
+                    ->where(function ($min) use ($age) {
+                        $min->whereNull('min_age')
+                            ->orWhere('min_age', '<=', 0)
+                            ->orWhere('min_age', '<=', $age);
+                    })
+                    ->where(function ($max) use ($age) {
+                        $max->whereNull('max_age')
+                            ->orWhere('max_age', '<=', 0)
+                            ->orWhere('max_age', '>=', $age);
+                    });
+            });
+        });
+    }
+
+    /**
+     * Whether a seeker's age is allowed for this job.
+     */
+    public function acceptsCandidateAge(?int $age): bool
+    {
+        if ((int) ($this->age_limit ?? 0) !== 1) {
+            return true;
+        }
+
+        if ($age === null) {
+            return false;
+        }
+
+        $min = (int) ($this->min_age ?? 0);
+        $max = (int) ($this->max_age ?? 0);
+
+        if ($min > 0 && $age < $min) {
+            return false;
+        }
+
+        if ($max > 0 && $age > $max) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Get the company/agency jobs scope
      *
      * @return mixed
      */
     public function scopeCompanyJobs($query, $company_id)
     {
         return $query->where('company_id', $company_id);
+    }
+    
+    public function scopeAgencyJobs($query, $agency_id)
+    {
+        return $query->where('agency_id', $agency_id);
     }
 
     /**
@@ -265,11 +382,16 @@ class Job extends Model
     }
 
     /**
-     * Get the company that owns the Job
+     * Get the company/agency that owns the Job
      */
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class)->with('user');
+    }
+    
+    public function agency(): BelongsTo
+   {
+    return $this->belongsTo(\App\Models\Agency::class)->with('user');
     }
 
     /**
@@ -380,10 +502,35 @@ class Job extends Model
     public function questions()
     {
         return $this->belongsToMany(CompanyQuestion::class);
+        return $this->belongsToMany(AgencyQuestion::class);
     }
 
     public function scopeDeadlineActive($query)
     {
         return $query->where('deadline', '>', now());
+    }
+
+    public function recordPublicView(): void
+    {
+        if (auth('user')->check() && authUser()->role === 'company') {
+            $company = authUser()->company;
+            if ($company && (int) $company->id === (int) $this->company_id) {
+                return;
+            }
+        }
+
+        $this->increment('total_views');
+    }
+
+    public function conversionRate(?int $applicants = null): float
+    {
+        $views = (int) ($this->total_views ?? 0);
+        if ($views < 1) {
+            return 0.0;
+        }
+
+        $applicantCount = $applicants ?? (int) ($this->applied_jobs_count ?? 0);
+
+        return round(($applicantCount / $views) * 100, 1);
     }
 }

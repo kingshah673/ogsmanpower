@@ -32,6 +32,7 @@ class DatabaseSeeder extends Seeder
     private function packagingVersion()
     {
         $this->call([
+            RolePermissionSeeder::class,
             SettingSeeder::class,
             LocationDatabaseSeeder::class,
             WebsiteSettingSeeder::class,

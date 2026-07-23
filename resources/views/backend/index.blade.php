@@ -10,7 +10,7 @@
     </div>
 @endsection
 @section('content')
-    @if ($appSetup->where('status', 0)->count())
+    @if (collect($appSetup)->where('status', 0)->count())
         <x-setup-guide />
     @endif
     @if (auth()->user()->hasRole('superadmin'))

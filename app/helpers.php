@@ -4,8 +4,11 @@ use App\Models\Advertisement;
 use App\Models\Candidate;
 use App\Models\Cms;
 use App\Models\Company;
+use App\Models\agency;
 use App\Models\Cookies;
 use App\Models\Job;
+use App\Models\Profession;
+use App\Models\ProfessionTranslation;
 use App\Models\Setting;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -30,23 +33,43 @@ use Torann\GeoIP\Facades\GeoIP;
 if (! function_exists('uploadImage')) {
     function uploadImage($file, $destinationPath, $fit = null, $quality = 60)
     {
-        $image = Image::make($file);
+        $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+        $fileName = time().'_'.uniqid().'.'.$extension;
+        $relativeDir = trim(str_replace('\\', '/', $destinationPath), '/');
+        $absoluteDir = public_path(str_replace('/', DIRECTORY_SEPARATOR, $relativeDir));
+        $fullPath = $absoluteDir.DIRECTORY_SEPARATOR.$fileName;
+        $relativePath = $relativeDir.'/'.$fileName;
 
-        $fileName = time().'_'.uniqid().'.'.$file->getClientOriginalExtension();
-        $fullPath = public_path($destinationPath.'/'.$fileName);
-
-        if (! File::isDirectory($destinationPath)) {
-            File::makeDirectory($destinationPath, 0777, true, true);
+        if (! File::isDirectory($absoluteDir)) {
+            File::makeDirectory($absoluteDir, 0777, true, true);
         }
 
-        if ($fit) {
-            $image->fit($fit[0], $fit[1]);
+        $saved = false;
+        $gdAvailable = extension_loaded('gd') || extension_loaded('imagick');
+
+        if ($gdAvailable) {
+            try {
+                $image = Image::make($file);
+                if ($fit) {
+                    $image->fit($fit[0], $fit[1]);
+                }
+                $image->save($fullPath, $quality);
+                $saved = is_file($fullPath) && filesize($fullPath) > 0;
+            } catch (\Throwable $e) {
+                $saved = false;
+            }
         }
 
-        $image->save($fullPath, $quality);
+        if (! $saved) {
+            $file->move($absoluteDir, $fileName);
+            $saved = is_file($fullPath) && filesize($fullPath) > 0;
+        }
 
-        // Return the relative path from the public directory
-        return $destinationPath.'/'.$fileName;
+        if (! $saved) {
+            throw new \RuntimeException('Failed to save uploaded image.');
+        }
+
+        return $relativePath;
     }
 }
 
@@ -59,13 +82,7 @@ if (! function_exists('uploadImage')) {
 if (! function_exists('deleteFile')) {
     function deleteFile(?string $image)
     {
-        $imageExists = file_exists($image);
-
-        if ($imageExists) {
-            if ($imageExists != 'backend/image/default.png') {
-                @unlink($image);
-            }
-        }
+        deleteImage($image);
     }
 }
 
@@ -78,13 +95,34 @@ if (! function_exists('deleteFile')) {
 if (! function_exists('deleteImage')) {
     function deleteImage(?string $image)
     {
-        $imageExists = file_exists($image);
+        if (empty($image) || $image === 'backend/image/default.png') {
+            return;
+        }
 
-        if ($imageExists) {
-            if ($imageExists != 'backend/image/default.png') {
-                @unlink($image);
+        $candidates = array_unique(array_filter([
+            $image,
+            public_path($image),
+            public_path(str_replace('\\', '/', $image)),
+        ]));
+
+        foreach ($candidates as $path) {
+            if (is_file($path)) {
+                @unlink($path);
+
+                return;
             }
         }
+    }
+}
+
+if (! function_exists('publicUploadExists')) {
+    function publicUploadExists(?string $relativePath): bool
+    {
+        if (empty($relativePath)) {
+            return false;
+        }
+
+        return is_file(public_path(str_replace('\\', '/', $relativePath)));
     }
 }
 
@@ -133,12 +171,14 @@ if (! function_exists('uploadFileToPublic')) {
     function uploadFileToPublic($file, string $path)
     {
         if ($file && $path) {
-            $url = $file->move('uploads/'.$path, $file->hashName());
-        } else {
-            $url = null;
+            $dir      = 'uploads/'.$path;
+            $filename = $file->hashName();
+            $file->move($dir, $filename);
+
+            return $dir.'/'.$filename;
         }
 
-        return $url;
+        return null;
     }
 }
 
@@ -384,14 +424,15 @@ if (! function_exists('updateManifest')) {
 
             'name' => config('app.name'),
             'short_name' => config('app.name'),
-            'start_url' => route('website.home'),
+            'start_url' => '/',
+            'scope' => '/',
             'background_color' => $setting->frontend_primary_color,
             'description' => config('app.name'),
             'display' => 'fullscreen',
             'theme_color' => $setting->frontend_primary_color,
             'icons' => [
                 [
-                    'src' => $setting->app_pwa_icon_url,
+                    'src' => parse_url($setting->app_pwa_icon_url, PHP_URL_PATH) ?: '/logo.png',
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'any maskable',
@@ -411,6 +452,90 @@ if (! function_exists('autoTransLation')) {
         $afterTrans = $tr->translate($text);
 
         return $afterTrans;
+    }
+}
+
+if (! function_exists('resumeImageLocalPath')) {
+    /**
+     * Resolve a stored path or asset URL to an absolute filesystem path under public/.
+     */
+    function resumeImageLocalPath(?string $pathOrUrl): ?string
+    {
+        if (empty($pathOrUrl)) {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $pathOrUrl)) {
+            $path = parse_url($pathOrUrl, PHP_URL_PATH);
+
+            return $path ? public_path(ltrim($path, '/')) : null;
+        }
+
+        return public_path(ltrim($pathOrUrl, '/'));
+    }
+}
+
+if (! function_exists('resumeImageSrc')) {
+    /**
+     * Image src for resume HTML/PDF — http URLs in browser, base64 in PDF engines.
+     */
+    function resumeImageSrc(?string $pathOrUrl, ?bool $forPdf = null): ?string
+    {
+        if (empty($pathOrUrl)) {
+            return null;
+        }
+
+        if ($forPdf === null) {
+            $forPdf = request()->input('action_type') === 'download';
+        }
+
+        $localPath = resumeImageLocalPath($pathOrUrl);
+
+        if (! $localPath || ! is_file($localPath)) {
+            if (preg_match('#^https?://#i', $pathOrUrl)) {
+                return $forPdf ? null : $pathOrUrl;
+            }
+
+            return $forPdf ? null : asset(ltrim($pathOrUrl, '/'));
+        }
+
+        if ($forPdf) {
+            $mime = @mime_content_type($localPath) ?: 'image/jpeg';
+
+            return 'data:'.$mime.';base64,'.base64_encode((string) file_get_contents($localPath));
+        }
+
+        $relative = str_replace('\\', '/', ltrim(str_replace(public_path(), '', $localPath), '/\\'));
+
+        return asset($relative);
+    }
+}
+
+if (! function_exists('generateResumeQrCode')) {
+    /**
+     * Generate a resume QR code without requiring the imagick PHP extension.
+     *
+     * @return array{svg: ?string, png: ?string}
+     */
+    function generateResumeQrCode(string $url): array
+    {
+        try {
+            $svg = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(80)->generate($url);
+
+            return ['svg' => $svg, 'png' => null];
+        } catch (\Throwable $e) {
+            \Log::warning('Resume QR (svg) failed: ' . $e->getMessage());
+        }
+
+        try {
+            $png = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(80)->generate($url);
+
+            return ['svg' => null, 'png' => base64_encode($png)];
+        } catch (\Throwable $e) {
+            \Log::warning('Resume QR (png) failed: ' . $e->getMessage());
+        }
+
+        return ['svg' => null, 'png' => null];
     }
 }
 
@@ -539,6 +664,14 @@ if (! function_exists('companies')) {
         return $companies;
     }
 }
+if (! function_exists('agencies')) {
+
+    function agencies()
+    {
+        return \App\Models\Agency::count();
+    }
+}
+
 
 if (! function_exists('newjob')) {
 
@@ -569,7 +702,7 @@ if (! function_exists('linkActive')) {
 if (! function_exists('candidateNotifications')) {
     function candidateNotifications()
     {
-        return auth()->user()->notifications()->take(6)->get();
+        return auth()->user()->notifications()->take(5)->get();
     }
 }
 
@@ -595,7 +728,7 @@ if (! function_exists('companyNotifications')) {
     function companyNotifications()
     {
 
-        return auth()->user()->notifications()->take(6)->get();
+        return auth()->user()->notifications()->take(5)->get();
     }
 }
 
@@ -609,6 +742,31 @@ if (! function_exists('companyNotificationsCount')) {
 if (! function_exists('companyUnreadNotifications')) {
 
     function companyUnreadNotifications()
+    {
+
+        return auth()->user()->unreadNotifications()->count();
+    }
+}
+
+if (! function_exists('agencyNotifications')) {
+
+    function agencyNotifications()
+    {
+
+        return auth()->user()->notifications()->take(6)->get();
+    }
+}
+
+if (! function_exists('agencyNotificationsCount')) {
+    function agencyNotificationsCount()
+    {
+        return auth()->user()->notifications()->count();
+    }
+}
+
+if (! function_exists('agencyUnreadNotifications')) {
+
+    function agencyUnreadNotifications()
     {
 
         return auth()->user()->unreadNotifications()->count();
@@ -939,15 +1097,181 @@ if (! function_exists('storePlanInformation')) {
     function storePlanInformation()
     {
         session()->forget('user_plan');
-        session(['user_plan' => isset(auth()->user()->company->userPlan) ? auth()->user()->company->userPlan : []]);
+
+        $user = auth()->user();
+
+        if ($user->role === 'company' && $user->company) {
+            session(['user_plan' => $user->company->userPlan]);
+        } elseif ($user->role === 'agency' && $user->agency) {
+            session(['user_plan' => $user->agency->userPlan]);
+        } else {
+            session(['user_plan' => null]);
+        }
     }
 }
+
 
 if (! function_exists('formatTime')) {
 
     function formatTime($date, $format = 'F d, Y H:i A')
     {
-        return Carbon::parse($date)->format($format);
+        if ($date === null || $date === '') {
+            return '';
+        }
+
+        try {
+            return Carbon::parse($date)->format($format);
+        } catch (\Throwable $e) {
+            return (string) $date;
+        }
+    }
+}
+
+if (! function_exists('formatResumeDate')) {
+    /** Clean date for CV output (no time component). */
+    function formatResumeDate($date, string $format = 'd M Y'): string
+    {
+        if ($date === null || $date === '') {
+            return '';
+        }
+
+        $raw = trim((string) $date);
+        if ($raw === '') {
+            return '';
+        }
+
+        if (preg_match('/^\d{4}$/', $raw)) {
+            return $raw;
+        }
+
+        try {
+            return Carbon::parse($raw)->format($format);
+        } catch (\Throwable $e) {
+            return preg_replace('/\s+\d{2}:\d{2}:\d{2}$/', '', $raw);
+        }
+    }
+}
+
+if (! function_exists('formatResumeYear')) {
+    function formatResumeYear($date): string
+    {
+        if ($date === null || $date === '') {
+            return '';
+        }
+
+        $raw = trim((string) $date);
+        if (preg_match('/^\d{4}$/', $raw)) {
+            return $raw;
+        }
+
+        try {
+            return Carbon::parse($raw)->format('Y');
+        } catch (\Throwable $e) {
+            return $raw;
+        }
+    }
+}
+
+if (! function_exists('resumeAge')) {
+    function resumeAge($birthDate): ?int
+    {
+        if ($birthDate === null || $birthDate === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($birthDate)->age;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+}
+
+if (! function_exists('resumeIsRtlLocale')) {
+    function resumeIsRtlLocale(?string $code): bool
+    {
+        return in_array(strtolower((string) $code), ['ar', 'ur', 'fa', 'he', 'ps', 'sd'], true);
+    }
+}
+
+/**
+ * Scripts that DomPDF + DejaVu cannot shape correctly (need mPDF + OTL / special fonts).
+ */
+if (! function_exists('resumeNeedsMpdfEngine')) {
+    function resumeNeedsMpdfEngine(?string $code): bool
+    {
+        $code = strtolower((string) $code);
+
+        if ($code === '' || $code === 'en') {
+            return false;
+        }
+
+        if (resumeIsRtlLocale($code)) {
+            return true;
+        }
+
+        return in_array($code, [
+            // Indic / South Asian
+            'hi', 'bn', 'ne', 'mr', 'gu', 'pa', 'ta', 'te', 'kn', 'ml', 'si',
+            // SE Asian complex
+            'th', 'lo', 'my', 'km',
+            // CJK
+            'zh', 'ja', 'ko',
+        ], true);
+    }
+}
+
+if (! function_exists('bilingualResumeLanguages')) {
+    /** @return list<array{code: string, name: string}> */
+    function bilingualResumeLanguages(): array
+    {
+        return [
+            ['code' => 'en', 'name' => 'English'],
+            ['code' => 'ar', 'name' => 'Arabic'],
+            ['code' => 'tr', 'name' => 'Turkish'],
+            ['code' => 'de', 'name' => 'German'],
+            ['code' => 'fr', 'name' => 'French'],
+            ['code' => 'es', 'name' => 'Spanish'],
+            ['code' => 'ro', 'name' => 'Romanian'],
+            ['code' => 'lt', 'name' => 'Lithuanian'],
+            ['code' => 'pl', 'name' => 'Polish'],
+            ['code' => 'ur', 'name' => 'Urdu'],
+            ['code' => 'hi', 'name' => 'Hindi'],
+            ['code' => 'bn', 'name' => 'Bengali'],
+            ['code' => 'id', 'name' => 'Indonesian'],
+            ['code' => 'ms', 'name' => 'Malay'],
+            ['code' => 'it', 'name' => 'Italian'],
+            ['code' => 'pt', 'name' => 'Portuguese'],
+            ['code' => 'ru', 'name' => 'Russian'],
+            ['code' => 'zh', 'name' => 'Chinese'],
+            ['code' => 'ja', 'name' => 'Japanese'],
+            ['code' => 'ko', 'name' => 'Korean'],
+            ['code' => 'nl', 'name' => 'Dutch'],
+            ['code' => 'sv', 'name' => 'Swedish'],
+            ['code' => 'no', 'name' => 'Norwegian'],
+            ['code' => 'da', 'name' => 'Danish'],
+            ['code' => 'fi', 'name' => 'Finnish'],
+            ['code' => 'el', 'name' => 'Greek'],
+            ['code' => 'th', 'name' => 'Thai'],
+            ['code' => 'vi', 'name' => 'Vietnamese'],
+            ['code' => 'fa', 'name' => 'Persian'],
+            ['code' => 'he', 'name' => 'Hebrew'],
+        ];
+    }
+}
+
+if (! function_exists('normalizeBilingualLanguageCode')) {
+    function normalizeBilingualLanguageCode(?string $code, ?string $custom = null): string
+    {
+        $code = strtolower(trim((string) $code));
+        if ($code === 'custom') {
+            $code = '';
+        }
+
+        $raw = strtolower(trim((string) ($custom ?: $code ?: 'en')));
+        $raw = preg_replace('/[^a-z-]/', '', $raw) ?: 'en';
+
+        return substr($raw, 0, 10);
     }
 }
 
@@ -1010,6 +1334,172 @@ if (! function_exists('openJobs')) {
     }
 }
 
+if (! function_exists('initialJobStatus')) {
+    /**
+     * Status for a newly created job.
+     * Auto when admin enables it, or when the employer still has plan job quota.
+     */
+    function initialJobStatus(): string
+    {
+        if (setting('job_auto_approved')) {
+            return 'active';
+        }
+
+        if (auth('user')->check()) {
+            $user = auth('user')->user();
+            if (in_array($user->role, ['company', 'agency'], true)) {
+                storePlanInformation();
+                $plan = session('user_plan');
+                if ($plan && (int) ($plan->job_limit ?? 0) > 0) {
+                    return 'active';
+                }
+            }
+        }
+
+        return 'pending';
+    }
+}
+
+if (! function_exists('activateEligiblePendingJobs')) {
+    /**
+     * Publish pending jobs when auto-approval rules allow it.
+     */
+    function activateEligiblePendingJobs(?Company $company = null): int
+    {
+        if (! $company) {
+            return 0;
+        }
+
+        storePlanInformation();
+        $userPlan = session('user_plan');
+
+        if (! setting('job_auto_approved') && (! $userPlan || (int) ($userPlan->job_limit ?? 0) < 1)) {
+            return 0;
+        }
+
+        return $company->jobs()->where('status', 'pending')->update(['status' => 'active']);
+    }
+}
+
+if (! function_exists('applyJobCountryScope')) {
+    /**
+     * Restrict jobs to the visitor's selected/default country.
+     * Falls back to the employer/agency country when the job row has no country set.
+     */
+    function applyJobCountryScope($query)
+    {
+        $selected_country = session()->get('selected_country');
+        $countryName = null;
+
+        if ($selected_country && $selected_country != null && $selected_country != 'all') {
+            $countryName = selected_country()->name;
+        } else {
+            $setting = loadSetting();
+            if ($setting->app_country_type == 'single_base' && $setting->app_country) {
+                $countryName = optional(\Modules\Location\Entities\Country::where('id', $setting->app_country)->first())->name;
+            }
+        }
+
+        if (blank($countryName)) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($countryName) {
+            $q->where('country', 'LIKE', "%{$countryName}%")
+                ->orWhere(function ($inner) use ($countryName) {
+                    $inner->where(function ($blank) {
+                        $blank->whereNull('country')->orWhere('country', '');
+                    })->where(function ($owner) use ($countryName) {
+                        $owner->whereHas('company', function ($company) use ($countryName) {
+                            $company->where('country', 'LIKE', "%{$countryName}%");
+                        })->orWhereHas('agency', function ($agency) use ($countryName) {
+                            $agency->where('country', 'LIKE', "%{$countryName}%");
+                        });
+                    });
+                });
+        });
+    }
+}
+
+if (! function_exists('finalizeJobForListing')) {
+    /**
+     * Ensure a newly posted job has listing fields needed for /jobs visibility.
+     */
+    function finalizeJobForListing(\App\Models\Job $job): void
+    {
+        $updates = [];
+
+        if (blank($job->job_roles)) {
+            $updates['job_roles'] = 'public';
+        }
+
+        if (blank($job->country)) {
+            $job->loadMissing('company', 'agency');
+
+            $country = $job->company?->country
+                ?? $job->agency?->country
+                ?? $job->ip_country
+                ?? optional(\Modules\Location\Entities\Country::find(loadSetting()->app_country))->name;
+
+            if (filled($country)) {
+                $updates['country'] = $country;
+            }
+        }
+
+        if ($updates !== []) {
+            $job->update($updates);
+        }
+    }
+}
+
+if (! function_exists('candidateFeaturedPlan')) {
+    function candidateFeaturedPlan(): ?\App\Models\CandidatePlan
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('candidate_plans')) {
+            return null;
+        }
+
+        return \App\Models\CandidatePlan::query()->first();
+    }
+}
+
+if (! function_exists('seedLocationSessionFromNames')) {
+    function seedLocationSessionFromNames(?string $countryName, ?string $stateName = null, ?string $cityName = null): void
+    {
+        if (config('templatecookie.map_show') || empty($countryName)) {
+            return;
+        }
+
+        $country = \App\Models\SearchCountry::where('name', $countryName)->first();
+        $state = null;
+        $city = null;
+
+        if ($stateName && $country) {
+            $state = \App\Models\State::where('name', $stateName)
+                ->where('country_id', $country->id)
+                ->first();
+        }
+
+        if ($cityName && $state) {
+            $city = \App\Models\City::where('name', $cityName)
+                ->where('state_id', $state->id)
+                ->first();
+        }
+
+        session([
+            'selectedCountryId' => $countryName,
+            'selectedStateId' => $stateName,
+            'selectedCityId' => $cityName,
+            'selectedCountryLong' => $country->long ?? null,
+            'selectedCountryLat' => $country->lat ?? null,
+            'selectedStateLong' => $state->long ?? null,
+            'selectedStateLat' => $state->lat ?? null,
+            'selectedCityLong' => $city->long ?? null,
+            'selectedCityLat' => $city->lat ?? null,
+        ]);
+    }
+}
+
 if (! function_exists('updateMap')) {
     function updateMap($data)
     {
@@ -1025,9 +1515,19 @@ if (! function_exists('updateMap')) {
         $location = session()->get('location');
 
         if ($location) {
-            $region = '';
             $region = array_key_exists('region', $location) ? $location['region'] : '';
             $country = array_key_exists('country', $location) ? $location['country'] : '';
+            $district = array_key_exists('district', $location) ? $location['district'] : '';
+            $exactLocation = array_key_exists('exact_location', $location) ? $location['exact_location'] : '';
+
+            // Do not wipe dropdown-saved location when the map session has no real data.
+            $hasMapData = filled($country) || filled($region) || filled($district) || filled($exactLocation);
+            if (! $hasMapData) {
+                session()->forget('location');
+
+                return true;
+            }
+
             if ($region == 'undefined') {
                 $address = Str::slug($country);
                 $region = '';
@@ -1040,13 +1540,13 @@ if (! function_exists('updateMap')) {
                 'neighborhood' => array_key_exists('neighborhood', $location) ? $location['neighborhood'] : '',
                 'locality' => array_key_exists('locality', $location) ? $location['locality'] : '',
                 'place' => array_key_exists('place', $location) ? $location['place'] : '',
-                'district' => array_key_exists('district', $location) ? $location['district'] : '',
+                'district' => $district,
                 'postcode' => array_key_exists('postcode', $location) ? $location['postcode'] : '',
                 'region' => $region ?? '',
-                'country' => array_key_exists('country', $location) ? $location['country'] : '',
+                'country' => $country,
                 'long' => array_key_exists('lng', $location) ? $location['lng'] : '',
                 'lat' => array_key_exists('lat', $location) ? $location['lat'] : '',
-                'exact_location' => array_key_exists('exact_location', $location) ? $location['exact_location'] : '',
+                'exact_location' => $exactLocation,
             ]);
             session()->forget('location');
             session([
@@ -1102,6 +1602,183 @@ if (! function_exists('get_file_size')) {
 }
 
 /**
+ * Resolve an uploaded file path stored as a public-relative or storage path.
+ */
+if (! function_exists('resolve_uploaded_file_path')) {
+    function resolve_uploaded_file_path(?string $file): ?string
+    {
+        if (! is_string($file) || trim($file) === '') {
+            return null;
+        }
+
+        $relative = ltrim(str_replace('\\', '/', $file), '/');
+        $candidates = array_filter([
+            $relative,
+            public_path($relative),
+            storage_path('app/public/'.$relative),
+            storage_path('app/'.$relative),
+        ]);
+
+        foreach ($candidates as $path) {
+            if (is_string($path) && is_file($path)) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+}
+
+/**
+ * Write large HTML to mPDF without hitting pcre.backtrack_limit.
+ *
+ * @param  \Mpdf\Mpdf  $mpdf
+ */
+if (! function_exists('mpdf_write_html_chunked')) {
+    function mpdf_write_html_chunked($mpdf, string $html, int $chunkSize = 40000): void
+    {
+        $current = (int) ini_get('pcre.backtrack_limit');
+        if ($current < 10000000) {
+            @ini_set('pcre.backtrack_limit', '10000000');
+        }
+
+        // Prefer CSS first, then body — reduces regex pressure on huge bilingual templates.
+        if (preg_match('/<style\b[^>]*>([\s\S]*?)<\/style>/i', $html, $styleMatch)) {
+            $css = '<style>'.$styleMatch[1].'</style>';
+            $body = preg_replace('/<style\b[^>]*>[\s\S]*?<\/style>/i', '', $html, 1) ?? $html;
+            try {
+                $mpdf->WriteHTML($css, \Mpdf\HTMLParserMode::HEADER_CSS);
+                $html = $body;
+            } catch (\Throwable $e) {
+                // Keep full HTML if CSS mode is unavailable.
+            }
+        }
+
+        $length = strlen($html);
+        if ($length <= $chunkSize) {
+            $mpdf->WriteHTML($html);
+
+            return;
+        }
+
+        $offset = 0;
+        while ($offset < $length) {
+            $remaining = $length - $offset;
+            $size = min($chunkSize, $remaining);
+            $chunk = substr($html, $offset, $size);
+
+            if ($size === $chunkSize && $offset + $size < $length) {
+                $breakAt = strrpos($chunk, '>');
+                if ($breakAt !== false && $breakAt > (int) ($chunkSize * 0.4)) {
+                    $chunk = substr($chunk, 0, $breakAt + 1);
+                }
+            }
+
+            $mpdf->WriteHTML($chunk);
+            $offset += strlen($chunk);
+        }
+    }
+}
+
+/**
+ * Download a standard (non-bilingual) resume view as a single A4 PDF.
+ */
+if (! function_exists('download_resume_pdf')) {
+    function download_resume_pdf(string $view, array $data, string $filename)
+    {
+        @ini_set('memory_limit', '256M');
+        @set_time_limit(120);
+
+        $data['compactPdf'] = true;
+        $data['forPdf'] = true;
+
+        $pdf = \PDF::loadView($view, $data)
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'dpi' => 96,
+                'defaultFont' => 'DejaVu Sans',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'isFontSubsettingEnabled' => true,
+            ]);
+
+        return $pdf->download($filename);
+    }
+}
+
+/**
+ * Download a (often large) bilingual CV HTML as PDF via mPDF.
+ * Raises memory/time limits; enables heavy OTL only for RTL locales.
+ */
+if (! function_exists('mpdf_download_bilingual_cv')) {
+    function mpdf_download_bilingual_cv(string $html, string $downloadName, ?string $locale = null)
+    {
+        @ini_set('memory_limit', '512M');
+        @ini_set('pcre.backtrack_limit', '10000000');
+        @set_time_limit(180);
+
+        $needsRtl = function_exists('resumeIsRtlLocale') && resumeIsRtlLocale($locale);
+        $needsMpdf = function_exists('resumeNeedsMpdfEngine') && resumeNeedsMpdfEngine($locale);
+
+        $html = preg_replace('/<!--[\s\S]*?-->/', '', $html) ?? $html;
+        $html = preg_replace('/<script\b[^>]*>[\s\S]*?<\/script>/i', '', $html) ?? $html;
+
+        // Latin-script bilingual CVs: DomPDF is faster. Hindi/Arabic/CJK need mPDF.
+        if (! $needsMpdf) {
+            $pdf = \PDF::loadHTML($html)
+                ->setPaper('a4', 'portrait')
+                ->setOptions([
+                    'dpi' => 96,
+                    'defaultFont' => 'DejaVu Sans',
+                    'isHtml5ParserEnabled' => true,
+                    'isRemoteEnabled' => true,
+                    'isFontSubsettingEnabled' => true,
+                ]);
+
+            return $pdf->download($downloadName);
+        }
+
+        $defaultFont = $needsRtl ? 'dejavusans' : 'freesans';
+
+        $mpdf = new \Mpdf\Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'margin_top' => 6,
+            'margin_bottom' => 6,
+            'margin_left' => 6,
+            'margin_right' => 6,
+            'default_font' => $defaultFont,
+            'useOTL' => 0xFF,
+            'useKashida' => $needsRtl ? 75 : 0,
+            'simpleTables' => true,
+            'packTableData' => true,
+        ]);
+
+        $mpdf->autoScriptToLang = true;
+        $mpdf->autoLangToFont = true;
+        $mpdf->autoVietnamese = false;
+        if ($needsRtl) {
+            $mpdf->baseScript = 1;
+            $mpdf->autoArabic = true;
+        }
+
+        // Prefer FreeSans for Devanagari (Hindi) shaping — DejaVu lacks proper conjuncts.
+        $locale = strtolower((string) $locale);
+        if (in_array($locale, ['hi', 'mr', 'ne'], true)) {
+            $html = str_replace(
+                "font-family: 'DejaVu Sans', Arial, sans-serif;",
+                "font-family: freesans, 'FreeSans', DejaVu Sans, sans-serif;",
+                $html
+            );
+        }
+
+        mpdf_write_html_chunked($mpdf, $html, 50000);
+
+        return $mpdf->Output($downloadName, \Mpdf\Output\Destination::DOWNLOAD);
+    }
+}
+
+/**
  * Increases or decreases the brightness of a color by a percentage of the current brightness.
  *
  * @param  string  $hexCode  Supported formats: `#FFF`, `#FFFFFF`, `FFF`, `FFFFFF`
@@ -1148,6 +1825,345 @@ if (! function_exists('current_country_code')) {
         }
 
         return $country_code;
+    }
+}
+
+if (! function_exists('phone_country_iso')) {
+    /**
+     * Resolve a 2-letter ISO country code for intl-tel-input defaults.
+     */
+    function phone_country_iso(?string $countryName = null): string
+    {
+        $fallback = strtolower((string) (current_country_code() ?: 'pk'));
+
+        if (! $countryName) {
+            return strlen($fallback) === 2 ? $fallback : 'pk';
+        }
+
+        static $map = null;
+
+        if ($map === null) {
+            $map = [];
+            $path = base_path('resources/seed-data/search_countries.json');
+
+            if (file_exists($path)) {
+                $rows = json_decode(file_get_contents($path), true) ?: [];
+
+                foreach ($rows as $row) {
+                    if (! empty($row['name']) && ! empty($row['iso2'])) {
+                        $map[strtolower($row['name'])] = strtolower($row['iso2']);
+                    }
+                }
+            }
+        }
+
+        $iso = $map[strtolower($countryName)] ?? $fallback;
+
+        return strlen($iso) === 2 ? $iso : 'pk';
+    }
+}
+
+if (! function_exists('cw_json_array')) {
+    /**
+     * Normalize a DB JSON column or Eloquent array-cast value to a plain array.
+     */
+    function cw_json_array(mixed $value, array $default = []): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+
+            return is_array($decoded) ? $decoded : $default;
+        }
+
+        return $default;
+    }
+}
+
+if (! function_exists('cw_profession_labels')) {
+    /** @return list<string> */
+    function cw_profession_labels(mixed $stored): array
+    {
+        $labels = [];
+
+        foreach (cw_json_array($stored) as $value) {
+            if (is_numeric($value)) {
+                $profession = Profession::find((int) $value);
+                $labels[] = $profession ? (string) $profession->name : (string) $value;
+            } else {
+                $text = trim((string) $value);
+                if ($text !== '') {
+                    $labels[] = $text;
+                }
+            }
+        }
+
+        return array_values(array_unique($labels));
+    }
+}
+
+if (! function_exists('cw_industry_labels')) {
+    /** @return list<string> */
+    function cw_industry_labels(mixed $stored): array
+    {
+        $labels = [];
+
+        foreach (cw_json_array($stored) as $value) {
+            if (is_numeric($value)) {
+                $industry = \App\Models\IndustryType::find((int) $value);
+                $labels[] = $industry ? (string) $industry->name : (string) $value;
+            } else {
+                $text = trim((string) $value);
+                if ($text !== '') {
+                    $labels[] = $text;
+                }
+            }
+        }
+
+        return array_values(array_unique($labels));
+    }
+}
+
+if (! function_exists('cw_normalize_multi_input')) {
+    /**
+     * Read a multi-value request field (Select2) with JSON payload fallback.
+     *
+     * @return list<int|string>
+     */
+    function cw_normalize_multi_input(\Illuminate\Http\Request $request, string $arrayKey, string $payloadKey): array
+    {
+        $values = $request->input($arrayKey, []);
+
+        if (! is_array($values)) {
+            $values = ($values !== null && $values !== '') ? [$values] : [];
+        }
+
+        if ($values === [] && $request->filled($payloadKey)) {
+            $values = cw_json_array($request->input($payloadKey));
+        }
+
+        return array_values(array_filter($values, static fn ($v) => $v !== null && $v !== ''));
+    }
+}
+
+if (! function_exists('cw_resolve_profession_ids')) {
+    /** @param  array<int|string>  $values */
+    function cw_resolve_profession_ids(array $values): array
+    {
+        $ids = [];
+        $locale = app()->getLocale();
+
+        foreach ($values as $value) {
+            if (is_numeric($value)) {
+                $ids[] = (int) $value;
+                continue;
+            }
+
+            $name = trim((string) $value);
+            if ($name === '') {
+                continue;
+            }
+
+            $translation = ProfessionTranslation::query()
+                ->where(function ($q) use ($name) {
+                    $q->where('name', $name)->orWhere('name', 'LIKE', '%'.$name.'%');
+                })
+                ->first();
+
+            if ($translation) {
+                $ids[] = (int) $translation->profession_id;
+                continue;
+            }
+
+            try {
+                $profession = Profession::create(['name' => $name]);
+                foreach (loadLanguage() as $language) {
+                    $profession->translateOrNew($language->code)->name = $name;
+                }
+                $profession->save();
+                $ids[] = (int) $profession->id;
+            } catch (\Throwable $e) {
+                \Log::warning('cw_resolve_profession_ids: '.$e->getMessage());
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+}
+
+if (! function_exists('cw_resolve_industry_ids')) {
+    /** @param  array<int|string>  $values */
+    function cw_resolve_industry_ids(array $values): array
+    {
+        $ids = [];
+        $locale = app()->getLocale();
+
+        foreach ($values as $value) {
+            if (is_numeric($value)) {
+                $ids[] = (int) $value;
+                continue;
+            }
+
+            $name = trim((string) $value);
+            if ($name === '') {
+                continue;
+            }
+
+            $translation = \App\Models\IndustryTypeTranslation::query()
+                ->where('locale', $locale)
+                ->where(function ($q) use ($name) {
+                    $q->where('name', $name)->orWhere('name', 'LIKE', '%'.$name.'%');
+                })
+                ->first();
+
+            if ($translation) {
+                $ids[] = (int) $translation->industry_type_id;
+                continue;
+            }
+
+            try {
+                $industry = \App\Models\IndustryType::create();
+                $industry->translateOrNew($locale)->name = $name;
+                $industry->save();
+                $ids[] = (int) $industry->id;
+            } catch (\Throwable $e) {
+                \Log::warning('cw_resolve_industry_ids: '.$e->getMessage());
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+}
+
+if (! function_exists('default_phone_country_iso')) {
+    /**
+     * Best default ISO2 for phone inputs: profile → session/site country → GeoIP → pk.
+     */
+    function default_phone_country_iso(): string
+    {
+        $countryName = null;
+
+        if (auth()->check()) {
+            $user = auth()->user();
+            $countryName = optional($user->candidate)->country
+                ?? optional($user->company)->country
+                ?? optional($user->agency)->country;
+        }
+
+        if ($countryName) {
+            return phone_country_iso($countryName);
+        }
+
+        if ($selected = selected_country()) {
+            return phone_country_iso($selected->name);
+        }
+
+        try {
+            $ip = request()->ip();
+            if ($ip && ! in_array($ip, ['127.0.0.1', '::1'], true)) {
+                $geo = GeoIP::getLocation($ip);
+                $iso = strtolower((string) ($geo->iso_code ?? ''));
+                if (strlen($iso) === 2) {
+                    return $iso;
+                }
+            }
+        } catch (\Throwable $e) {
+            // fall through to phone_country_iso default
+        }
+
+        return phone_country_iso(null);
+    }
+}
+
+if (! function_exists('default_destination_country_name')) {
+    /**
+     * Default destination for nominating workers / visa: GeoIP only.
+     * Do not use selected_country() — that is the site job-filter country and often wrong
+     * (e.g. first/random CMS location). On localhost with no GeoIP, leave empty so the user picks.
+     */
+    function default_destination_country_name(): ?string
+    {
+        try {
+            $ip = request()->ip();
+            if ($ip && ! in_array($ip, ['127.0.0.1', '::1'], true)) {
+                $geo = GeoIP::getLocation($ip);
+                $iso = strtoupper((string) ($geo->iso_code ?? ''));
+                if (strlen($iso) === 2) {
+                    $byIso = \App\Models\SearchCountry::query()
+                        ->whereRaw('UPPER(short_name) = ?', [$iso])
+                        ->value('name');
+                    if ($byIso) {
+                        return $byIso;
+                    }
+                }
+                $geoName = trim((string) ($geo->country ?? ''));
+                if ($geoName !== '') {
+                    $byName = \App\Models\SearchCountry::query()
+                        ->whereRaw('LOWER(name) = ?', [strtolower($geoName)])
+                        ->value('name');
+                    if ($byName) {
+                        return $byName;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // no reliable IP location
+        }
+
+        return null;
+    }
+}
+
+if (! function_exists('user_home_route')) {
+    /**
+     * Role-aware dashboard/home URL for frontend (portal) users.
+     */
+    function user_home_route($user = null): string
+    {
+        $user = $user ?: auth('user')->user();
+
+        if (! $user) {
+            return route('website.home');
+        }
+
+        if ($user->role === 'company') {
+            $redirect = \App\Services\Company\CompanyDocumentVerificationService::redirectIfBlocked($user->company);
+            if ($redirect) {
+                return $redirect->getTargetUrl();
+            }
+        }
+
+        return match ($user->role) {
+            'candidate' => route('candidate.dashboard'),
+            'company'   => route('company.dashboard'),
+            'agency'    => route('agency.dashboard'),
+            'agent'     => route('agent.dashboard'),
+            default     => route('website.home'),
+        };
+    }
+}
+
+if (! function_exists('user_post_auth_route')) {
+    /**
+     * Where to send a user immediately after register/login (OTP gate when required).
+     */
+    function user_post_auth_route($user = null): string
+    {
+        $user = $user ?: auth('user')->user();
+
+        if (! $user) {
+            return route('website.home');
+        }
+
+        // OTP before document upload / dashboard for portal roles that require it.
+        if (in_array($user->role, ['company', 'agent', 'agency'], true) && ! $user->is_otp_verified) {
+            return route('otp.verify');
+        }
+
+        return user_home_route($user);
     }
 }
 
@@ -1324,12 +2340,44 @@ if (! function_exists('currentCandidate')) {
 }
 
 /**
+ * Limit a Job query to age-eligible listings for the logged-in seeker.
+ * Guests and non-candidate roles are unchanged.
+ *
+ * @param  \Illuminate\Database\Eloquent\Builder|\App\Models\Job  $query
+ * @return \Illuminate\Database\Eloquent\Builder|\App\Models\Job
+ */
+if (! function_exists('applyCandidateAgeFilter')) {
+    function applyCandidateAgeFilter($query)
+    {
+        $user = authUser();
+        if (! $user && auth('sanctum')->check()) {
+            $user = auth('sanctum')->user();
+        }
+
+        if (! $user || ($user->role ?? null) !== 'candidate') {
+            return $query;
+        }
+
+        $candidate = $user->candidate ?? null;
+        $age = $candidate?->resolvedAge();
+
+        return $query->matchingCandidateAge($age);
+    }
+}
+
+/**
  * Authenticate candidate
  */
 if (! function_exists('currentCompany')) {
     function currentCompany()
     {
         return authUser()->company;
+    }
+}
+if (! function_exists('currentAgency')) {
+    function currentAgency()
+    {
+        return authUser()->agency;
     }
 }
 
@@ -1339,7 +2387,19 @@ if (! function_exists('currentCompany')) {
 if (! function_exists('authUser')) {
     function authUser()
     {
-        return auth('user')->user();
+        $guard = auth('user');
+        $user = $guard->user();
+
+        if ($user) {
+            return $user;
+        }
+
+        // Session still holds a user id but the record is gone — clear stale login.
+        if ($guard->id()) {
+            $guard->logout();
+        }
+
+        return null;
     }
 }
 
@@ -1727,5 +2787,151 @@ if (! function_exists('loadAdvertisements')) {
         return Cache::remember('advertisements', now()->addDays(30), function () {
             return Advertisement::all();
         });
+    }
+}
+
+if (! function_exists('registrationTypeMeta')) {
+    /**
+     * Map ?type= registration query values to labels and portal roles.
+     * Specialty signups reuse seeker / employer / agency / agent / broker portals
+     * until dedicated modules ship; specialty key is stored in users.signup_type.
+     *
+     * @return array{label: string, role: string, type: string, headline: string, description: string, profile: string}
+     */
+    function registrationTypeMeta(?string $type): array
+    {
+        $type = strtolower(trim((string) $type));
+
+        return match ($type) {
+            'seeker', 'candidate', 'job_seeker' => [
+                'label' => __('seeker'),
+                'role' => 'candidate',
+                'type' => 'seeker',
+                'profile' => 'candidate',
+                'headline' => __('job_seeker'),
+                'description' => __('job_seeker_description'),
+            ],
+            'employer', 'company' => [
+                'label' => __('employer'),
+                'role' => 'company',
+                'type' => 'employer',
+                'profile' => 'company',
+                'headline' => __('employer'),
+                'description' => __('employer_company_description'),
+            ],
+            'agency' => [
+                'label' => __('recruitment_agency'),
+                'role' => 'agency',
+                'type' => 'agency',
+                'profile' => 'agency',
+                'headline' => __('recruitment_agency'),
+                'description' => __('recruitment_agency_description'),
+            ],
+            'agent' => [
+                'label' => 'Agent / Facilitator',
+                'role' => 'agent',
+                'type' => 'agent',
+                'profile' => 'agent',
+                'headline' => 'Agent / Facilitator',
+                'description' => __('recruitment_agent_description'),
+            ],
+            'broker', 'middleman', 'demand_partner' => [
+                'label' => 'Broker / Middleman',
+                'role' => 'broker',
+                'type' => 'broker',
+                'profile' => 'broker',
+                'headline' => 'Broker / Middleman',
+                'description' => 'Create demand requests and route them to Recruitment Agencies.',
+            ],
+            'labour_supply' => [
+                'label' => 'Labour Supply Office',
+                'role' => 'company',
+                'type' => 'labour_supply',
+                'profile' => 'company',
+                'headline' => 'Labour Supply Office',
+                'description' => 'Register your labour supply office and connect workforce to employers worldwide.',
+            ],
+            'hr_referral', 'hr' => [
+                'label' => 'HR Referral Partner',
+                'role' => 'agent',
+                'type' => 'hr_referral',
+                'profile' => 'agent',
+                'headline' => 'HR Referral Partner',
+                'description' => 'Refer candidates to employers and agencies and grow your referral network.',
+            ],
+            'domestic_office', 'domestic_worker_office' => [
+                'label' => 'Domestic Worker Office',
+                'role' => 'agency',
+                'type' => 'domestic_office',
+                'profile' => 'agency',
+                'headline' => 'Domestic Worker Office',
+                'description' => 'Register your domestic worker office and manage placements for household roles.',
+            ],
+            'domestic_worker', 'selected_domestic', 'nominated_worker' => [
+                'label' => 'Selected Domestic Worker',
+                'role' => 'candidate',
+                'type' => 'domestic_worker',
+                'profile' => 'candidate',
+                'headline' => 'Selected Domestic Worker',
+                'description' => 'Create your worker profile, upload documents, and get matched to household opportunities.',
+            ],
+            'university', 'education_institution' => [
+                'label' => 'University / College / School',
+                'role' => 'company',
+                'type' => 'university',
+                'profile' => 'company',
+                'headline' => 'University / College / School',
+                'description' => 'Register your institution and connect students with overseas education and career pathways.',
+            ],
+            'abroad_student', 'abroad_edu_student' => [
+                'label' => 'Abroad Edu Student',
+                'role' => 'candidate',
+                'type' => 'abroad_student',
+                'profile' => 'candidate',
+                'headline' => 'Abroad Edu Student',
+                'description' => 'Build your student profile and explore study-abroad and career support opportunities.',
+            ],
+            'eu_permit_specialist', 'eu_work_permit_specialist' => [
+                'label' => 'EU Work Permit Specialist',
+                'role' => 'agency',
+                'type' => 'eu_permit_specialist',
+                'profile' => 'agency',
+                'headline' => 'EU Work Permit Specialist',
+                'description' => 'Register as an EU work-permit specialist and support employers and seekers with permit cases.',
+            ],
+            'work_permit_seeker' => [
+                'label' => 'Work Permit Seeker',
+                'role' => 'candidate',
+                'type' => 'work_permit_seeker',
+                'profile' => 'candidate',
+                'headline' => 'Work Permit Seeker',
+                'description' => 'Create your seeker profile and get guidance toward EU and overseas work-permit opportunities.',
+            ],
+            default => [
+                'label' => '',
+                'role' => '',
+                'type' => '',
+                'profile' => '',
+                'headline' => __('create_account'),
+                'description' => __('footer_description'),
+            ],
+        };
+    }
+}
+
+if (! function_exists('registrationPortalRoles')) {
+    /**
+     * Portal roles that receive company-document or agency-license forms.
+     *
+     * @return array{company_docs: string[], agency_license: string[]}
+     */
+    function registrationFormRequirements(?string $type): array
+    {
+        $type = strtolower(trim((string) $type));
+
+        return [
+            'company_docs' => in_array($type, ['employer', 'company'], true),
+            'agency_license' => $type === 'agency',
+        ];
     }
 }

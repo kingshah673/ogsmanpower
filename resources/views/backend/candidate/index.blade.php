@@ -31,6 +31,11 @@
                                         class="fas fa-plus mr-1"></i> {{ __('create') }}
                                 </a>
                             @endif
+                            @if (auth()->user()->hasRole('superadmin'))
+                                <a href="{{ route('admin.candidate.dynamic_inputs') }}" class="btn btn-primary">
+                                    {{ __('Settings fields') }}
+                                </a>
+                            @endif
                             @if (request('keyword') || request('ev_status') || request('sort_by'))
                                 <a href="{{ route('company.index') }}" class="btn bg-danger"><i
                                         class="fas fa-times"></i>&nbsp; {{ __('clear') }}
@@ -196,9 +201,9 @@
                                                 @endif
 
                                                 @if (auth()->user()->hasRole('superadmin'))
-                                                    <a href="{{ route('admin.candidate.dyanmic_inputs', $candidate->id) }}"
-                                                        class="btn btn-primary">
-                                                        Inputs
+                                                    <a href="{{ route('admin.candidate.dynamic_inputs') }}"
+                                                        class="btn btn-primary btn-sm" title="{{ __('All seeker settings fields') }}">
+                                                        {{ __('Fields') }}
                                                     </a>
                                                 @endif
                                                 @if (userCan('candidate.update'))

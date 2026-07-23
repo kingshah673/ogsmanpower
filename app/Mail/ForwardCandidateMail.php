@@ -32,7 +32,7 @@ class ForwardCandidateMail extends Mailable
 
     public function build()
     {
-        $mail = $this->from('noreply@ogstravel.com','OGS Recruitment Team')
+        $mail = $this->from('no-reply@careerworkforce.com','Career Work Force Recruitment Team')
         ->subject('Candidate Profile: '.$this->candidate->user->name)
         ->view('emails.forward_candidate');
 

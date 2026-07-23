@@ -38,7 +38,10 @@ class CompanyAccountProgressService
 
                 $update = $this->personalProfileUpdate($request);
                 if ($update) {
-                    return redirect('company/account-progress?profile');
+                    return redirect()
+                        ->route('company.account-progress', [], false)
+                        ->with('success', __('Branding saved successfully.'))
+                        ->withFragment('section-profile');
                 }
 
                 return back();
@@ -54,7 +57,10 @@ class CompanyAccountProgressService
 
                 $update = $this->companyProfileUpdate($request);
                 if ($update) {
-                    return redirect('company/account-progress?social')->send();
+                    return redirect()
+                        ->route('company.account-progress', [], false)
+                        ->with('success', __('Company profile saved successfully.'))
+                        ->withFragment('section-social');
                 }
 
                 return back()->send();
@@ -62,7 +68,10 @@ class CompanyAccountProgressService
             case 'social':
                 $update = $this->socialProfileUpdate($request);
                 if ($update) {
-                    return redirect('company/account-progress?contact')->send();
+                    return redirect()
+                        ->route('company.account-progress', [], false)
+                        ->with('success', __('Social links saved successfully.'))
+                        ->withFragment('section-contact');
                 }
 
                 return back()->send();
@@ -87,7 +96,8 @@ class CompanyAccountProgressService
 
                 $update = $this->contactProfileUpdate($request);
                 if ($update) {
-                    return redirect('company/account-progress?complete')->send();
+                    return redirect()->route('company.dashboard')
+                        ->with('success', __('congratulations_you_profile_is_complete'));
                 }
 
                 return back()->send();
@@ -139,7 +149,11 @@ class CompanyAccountProgressService
     // }
     public function personalProfileUpdate($request)
     {
-        $user = User::findOrFail(auth()->user()->id);
+        $user = authUser();
+
+        if (! $user) {
+            abort(401);
+        }
         $company = Company::where('user_id', $user->id)->firstOrFail();
         $name = $request->name;
         $newUsername = Str::slug($name);
@@ -278,7 +292,32 @@ class CompanyAccountProgressService
      */
     public function contactProfileUpdate($request): mixed
     {
-        $user = User::findOrFail(auth()->user()->id);
+        $user = authUser();
+
+        if (! $user) {
+            abort(401);
+        }
+
+        if (! session()->get('location') && $request->filled('location')) {
+            $company = $user->company;
+            session()->put('location', [
+                'exact_location' => $request->input('location'),
+                'country' => $company->country,
+                'region' => $company->region,
+                'district' => $company->district,
+                'lat' => $company->lat,
+                'lng' => $company->long,
+            ]);
+        }
+
+        if (empty(config('templatecookie.map_show')) && $request->filled('country')) {
+            seedLocationSessionFromNames(
+                $request->input('country'),
+                $request->input('state'),
+                $request->input('district')
+            );
+        }
+
         $contact = ContactInfo::where('user_id', $user->id)->update($request->only('phone', 'email'));
 
         // =========== Location ===========

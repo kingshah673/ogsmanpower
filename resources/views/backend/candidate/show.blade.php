@@ -32,6 +32,9 @@
                                 </div>
                                 <div>
                                     <h3>{{ $candidate->user->name }}</h3>
+                                    @if(!empty($candidate->public_code))
+                                        <p class="mb-1"><strong>Code:</strong> <code>{{ $candidate->public_code }}</code></p>
+                                    @endif
                                     <p>{{ $candidate->user->email }}</p>
                                     @if ($user->socialInfo && $candidate->user->socialInfo->count() > 0)
                                         <div class="d-flex">
@@ -307,6 +310,50 @@
     {{-- Leaflet  --}}
     <script src="{{ asset('frontend') }}/assets/js/axios.min.js"></script>
     <x-map.leaflet.map_scripts />
+    <script>
+        $('.status-switch').on('change', function() {
+            var status = $(this).prop('checked') == true ? 1 : 0;
+            var id = $(this).data('id');
+            if (!id) {
+                toastr.error('Missing user id for status change');
+                return;
+            }
+            $.ajax({
+                type: "GET",
+                dataType: "json",
+                url: '{{ route('candidate.status.change') }}',
+                data: { status: status, id: id },
+                success: function(response) {
+                    toastr.success(response.message || 'Updated', 'Success');
+                    $('#status_' + id).text(status == 1 ? "{{ __('activated') }}" : "{{ __('deactivated') }}");
+                },
+                error: function(xhr) {
+                    toastr.error((xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Status update failed');
+                }
+            });
+        });
+
+        $('.email-verification-switch').on('change', function() {
+            var status = $(this).prop('checked') == true ? 1 : 0;
+            var id = $(this).data('userid');
+            if (!id) {
+                toastr.error('Missing user id for verification change');
+                return;
+            }
+            $.ajax({
+                type: "GET",
+                dataType: "json",
+                url: '{{ route('company.verify.change') }}',
+                data: { status: status, id: id },
+                success: function(response) {
+                    toastr.success(response.message || 'Updated', 'Success');
+                },
+                error: function(xhr) {
+                    toastr.error((xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Verification update failed');
+                }
+            });
+        });
+    </script>
     <script>
         var oldlat = {!! $candidate->lat ? $candidate->lat : $setting->default_lat !!};
         var oldlng = {!! $candidate->long ? $candidate->long : $setting->default_long !!};

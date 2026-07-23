@@ -16,10 +16,14 @@ class CloudMessageController extends Controller
 
     public $factory;
 
-    public function __construct(Messaging $messaging)
+    public function __construct()
     {
-        $this->factory = (new Factory)->withServiceAccount(storage_path('firebase_credentials.json'));
-        $this->messaging = $this->factory->createMessaging();
+        try {
+            $this->factory = (new Factory)->withServiceAccount(storage_path('firebase_credentials.json'));
+            $this->messaging = $this->factory->createMessaging();
+        } catch (\Throwable $e) {
+            \Log::warning('Firebase credentials not available: ' . $e->getMessage());
+        }
     }
 
     public function storeTokenAnonymous(Request $request)

@@ -29,7 +29,7 @@
             transition: background-color 0.3s ease;
         }
     </style>
-    @if (userCan('candidate.create'))
+    @if (auth()->user()->hasRole('superadmin') || userCan('candidate.update') || userCan('candidate.create'))
         <div class="container-fluid">
             <!-- Button to add a new dynamic input -->
             <div class="row mb-3">
@@ -133,12 +133,17 @@
                     </div>
                     <div class="form-group">
                         <label for="inputType">Input Type</label>
-                        <select id="inputType" class="form-control">
+                        <select id="inputType" class="form-control" onchange="toggleOptionsField(this.value)">
                             <option value="text">Text</option>
-                            <option value="email">Email</option>
-                            <option value="password">Password</option>
-                            <option value="number">Number</option>
+                            <option value="textarea">Textarea</option>
+                            <option value="date">Date</option>
+                            <option value="dropdown">Dropdown</option>
+                            <option value="file">File Upload</option>
                         </select>
+                    </div>
+                    <div class="form-group" id="dropdownOptionsGroup" style="display:none">
+                        <label for="inputOptions">Dropdown Options <small class="text-muted">(one per line)</small></label>
+                        <textarea id="inputOptions" class="form-control" rows="4" placeholder="Option 1&#10;Option 2&#10;Option 3"></textarea>
                     </div>
                     <div class="form-group">
                         <label for="inputRequired">Is Required?</label>
@@ -171,11 +176,16 @@
             $('#dynamicInputModal').modal('show');
         }
 
+        function toggleOptionsField(type) {
+            document.getElementById('dropdownOptionsGroup').style.display = (type === 'dropdown') ? 'block' : 'none';
+        }
+
         function addDynamicInput() {
-            var inputLabel = document.getElementById("inputLabel").value;
-            var inputType = document.getElementById("inputType").value;
+            var inputLabel    = document.getElementById("inputLabel").value;
+            var inputType     = document.getElementById("inputType").value;
             var inputRequired = document.getElementById("inputRequired").value;
-            var inputActive = document.getElementById("inputActive").value;
+            var inputActive   = document.getElementById("inputActive").value;
+            var inputOptions  = document.getElementById("inputOptions").value;
 
             if (inputLabel && inputType) {
                 $.ajax({
@@ -186,7 +196,8 @@
                         type: inputType,
                         required: inputRequired,
                         active: inputActive,
-                        candidate_id: {{ $candidate->id }}, // Pass the candidate ID
+                        options: inputOptions,
+                        candidate_id: {{ $candidate->id }},
                         _token: "{{ csrf_token() }}"
                     },
                     beforeSend: function() {
@@ -269,7 +280,7 @@
         function deleteInput(id) {
             if (confirm("Are you sure you want to delete this input?")) {
                 $.ajax({
-                    url: "{{ route('candidate.delete_dynamic_input', '') }}/" + id,
+                    url: "{{ route('candidate.delete_dynamic_input', ['id' => 0]) }}".replace('/0', '/' + id),
                     method: "DELETE",
                     data: {
                         _token: "{{ csrf_token() }}"

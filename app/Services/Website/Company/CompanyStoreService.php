@@ -6,11 +6,18 @@ use App\Http\Traits\JobAble;
 use App\Models\Admin;
 use App\Models\CandidateJobAlert;
 use App\Models\CompanyAttributeTranslation;
+use App\Models\Education;
+use App\Models\EducationTranslation;
+use App\Models\Experience;
+use App\Models\ExperienceTranslation;
+use App\Models\IndustryType;
 use App\Models\Job;
 use App\Models\JobCategory;
 use App\Models\JobCategoryTranslation;
 use App\Models\JobRole;
 use App\Models\JobRoleTranslation;
+use App\Models\JobType;
+use App\Models\SalaryType;
 use App\Notifications\Admin\NewJobAvailableNotification;
 use App\Notifications\Website\Candidate\RelatedJobNotification;
 use App\Notifications\Website\Company\JobCreatedNotification;
@@ -18,6 +25,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
 
 
 class CompanyStoreService
@@ -35,10 +43,8 @@ class CompanyStoreService
         storePlanInformation();
         $userPlan = session('user_plan');
 
-        if ((int) $userPlan->job_limit < 1) {
-            session()->flash('error', __('you_have_reached_your_plan_limit_please_upgrade_your_plan'));
-
-            return redirect()->route('company.plan');
+        if (! $userPlan || (int) ($userPlan->job_limit ?? 0) < 1) {
+            throw new \RuntimeException(__('you_have_reached_your_plan_limit_please_upgrade_your_plan'));
         }
 
         $min = $request->min_salary;
@@ -64,23 +70,8 @@ class CompanyStoreService
         $highlight = $request->badge == 'highlight' ? 1 : 0;
         $featured = $request->badge == 'featured' ? 1 : 0;
 
-        // Job Category
-        $job_category_request = $request->category_id;
-
-        $job_category = JobCategoryTranslation::where('job_category_id', $job_category_request)->orWhere('name', $job_category_request)->first();
-        if (! $job_category) {
-            $new_job_category = JobCategory::create(['name' => $job_category_request]);
-
-            $languages = loadLanguage();
-            foreach ($languages as $language) {
-                $new_job_category->translateOrNew($language->code)->name = $job_category_request;
-            }
-            $new_job_category->save();
-
-            $job_category_id = $new_job_category->id;
-        } else {
-            $job_category_id = $job_category->job_category_id;
-        }
+        // Job Category (form posts IndustryType id — jobs.category_id references job_categories)
+        $job_category_id = $this->resolveJobCategoryId($request->category_id);
 
         // Job Role
         $job_role_request = $request->role_id;
@@ -111,28 +102,17 @@ class CompanyStoreService
         $ip = $request->ip();
 
         if (app()->environment('local')) {
-            $ip = '8.8.8.8'; // Example public IP for testing
+            $ip = '8.8.8.8';
         }
 
-        $location = Cache::remember("ip_location_{$ip}", now()->addMinutes(30), function () use ($ip) {
-            return Http::get("http://ip-api.com/json/{$ip}")->json();
-        });
-
-        $country = $location['country'] ?? null;
-        $city = $location['city'] ?? null;
-
-        $vpnCheck = Cache::remember("vpn_check_{$ip}", now()->addMinutes(30), function () use ($ip) {
-            return Http::get("https://ipqualityscore.com/api/json/ip/YOUR_API_KEY/{$ip}")->json();
-        });
-
-        $isVpn = $vpnCheck['vpn'] ?? false; // Detect VPN usage
-
-        if ($isVpn) {
-            return response()->json([
-                'message' => 'VPN usage detected. Please disable VPN to continue.',
-                'ip' => $ip,
-                'location' => $location
-            ], 403);
+        $country = null;
+        try {
+            $location = Cache::remember("ip_location_{$ip}", now()->addMinutes(30), function () use ($ip) {
+                return Http::timeout(3)->get("http://ip-api.com/json/{$ip}")->json();
+            });
+            $country = $location['country'] ?? null;
+        } catch (\Throwable $e) {
+            // Non-blocking: job posting must not fail when geo lookup is unavailable.
         }
 
         $jobCreated = Job::create([
@@ -140,7 +120,7 @@ class CompanyStoreService
             'company_id' => currentCompany()->id,
             'category_id' => $job_category_id,
             'role_id' => $job_role_id,
-            'education_id' => $request->education,
+            'education_id' => $request->education ?: $this->defaultEducationId(),
             'experience_id' => $request->experience,
             'salary_mode' => $request->salary_mode,
             'custom_salary' => $request->custom_salary,
@@ -153,11 +133,14 @@ class CompanyStoreService
             'apply_on' => $request->apply_on,
             'apply_email' => $request->apply_email ?? null,
             'apply_url' => $request->apply_url ?? null,
-            'description' => $request->description,
+            'description'    => $request->description,
+            'title_ar'       => $request->title_ar ?? null,
+            'description_ar' => $request->description_ar ?? null,
             'featured' => $featured,
             'highlight' => $highlight,
             'is_remote' => $request->is_remote ?? 0,
-            'status' => setting('job_auto_approved') ? 'active' : 'pending',
+            'status' => initialJobStatus(),
+            'job_roles' => 'public',
 
 
             'currency'=>$request->currency,
@@ -175,6 +158,7 @@ class CompanyStoreService
 
         // Location
         updateMap($jobCreated);
+        finalizeJobForListing($jobCreated);
 
         // Question
         if (isset($request->companyQuestions) && $request->has('companyQuestions')) {
@@ -250,5 +234,311 @@ class CompanyStoreService
         }
 
         return $jobCreated;
+    }
+
+    /**
+     * Create a job from AI-parsed advertisement data (batch or single).
+     *
+     * @param  array<string, mixed>  $job
+     * @param  array<string, mixed>  $shared
+     */
+    public function createFromParsedJob(array $job, array $shared = []): Job
+    {
+        return DB::transaction(function () use ($job, $shared) {
+            return $this->createFromParsedJobWithinTransaction($job, $shared);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $job
+     * @param  array<string, mixed>  $shared
+     */
+    private function createFromParsedJobWithinTransaction(array $job, array $shared = []): Job
+    {
+        storePlanInformation();
+        $userPlan = session('user_plan');
+
+        if (! $userPlan || (int) ($userPlan->job_limit ?? 0) < 1) {
+            throw new \RuntimeException(__('you_have_reached_your_plan_limit_please_upgrade_your_plan'));
+        }
+
+        $title = (string) ($job['job_title'] ?? '');
+        if ($title === '') {
+            throw new \InvalidArgumentException(__('Job title is required.'));
+        }
+
+        $categoryInput = $job['category_id'] ?? $job['industry'] ?? $shared['category_id'] ?? $shared['industry'] ?? 'General';
+        $job_category_id = $this->resolveJobCategoryId($categoryInput);
+
+        $roleName = (string) ($job['job_role'] ?? $title);
+        $job_role_id = $this->resolveOrCreateJobRoleId($roleName);
+
+        $deadline = $this->resolveParsedDeadline($job, $shared);
+
+        $this->seedSessionLocationForParsedJob($job, $shared);
+
+        $salaryMode = in_array($job['salary_mode'] ?? '', ['range', 'custom'], true)
+            ? $job['salary_mode']
+            : 'custom';
+
+        $description = (string) ($job['description'] ?? '');
+        if (mb_strlen(strip_tags($description)) < 30) {
+            $description = '<p>' . e($title) . '</p>' . $description;
+        }
+
+        $applyOn = 'app';
+        if (! empty($job['apply_email']) || ! empty($shared['apply_email'])) {
+            $applyOn = 'email';
+        } elseif (! empty($job['apply_url']) || ! empty($shared['apply_url'])) {
+            $applyOn = 'custom_url';
+        }
+
+        $ip = request()->ip();
+        if (app()->environment('local')) {
+            $ip = '8.8.8.8';
+        }
+
+        $ipCountry = null;
+        try {
+            $location = Cache::remember("ip_location_{$ip}", now()->addMinutes(30), function () use ($ip) {
+                return Http::timeout(3)->get("http://ip-api.com/json/{$ip}")->json();
+            });
+            $ipCountry = $location['country'] ?? null;
+        } catch (\Throwable $e) {
+        }
+
+        $jobCreated = Job::create([
+            'title' => $title,
+            'company_id' => currentCompany()->id,
+            'category_id' => $job_category_id,
+            'role_id' => $job_role_id,
+            'education_id' => $job['education_id'] ?? $this->defaultEducationId(),
+            'experience_id' => $job['experience_id'] ?? $this->defaultExperienceId(),
+            'salary_mode' => $salaryMode,
+            'custom_salary' => $salaryMode === 'custom'
+                ? ($job['custom_salary'] ?? ($job['min_salary'] && $job['max_salary']
+                    ? $job['min_salary'] . ' - ' . $job['max_salary'] . ' ' . ($job['currency'] ?? 'USD')
+                    : 'Competitive'))
+                : null,
+            'min_salary' => $salaryMode === 'range' ? ($job['min_salary'] ?? null) : null,
+            'max_salary' => $salaryMode === 'range' ? ($job['max_salary'] ?? null) : null,
+            'salary_type_id' => $job['salary_type_id'] ?? $this->defaultSalaryTypeId(),
+            'deadline' => $deadline,
+            'job_type_id' => $job['job_type_id'] ?? $this->defaultJobTypeId(),
+            'vacancies' => max(1, (int) ($job['vacancies'] ?? 1)),
+            'apply_on' => $applyOn,
+            'apply_email' => $job['apply_email'] ?? $shared['apply_email'] ?? null,
+            'apply_url' => $job['apply_url'] ?? $shared['apply_url'] ?? null,
+            'description' => $description,
+            'title_ar' => $job['job_title_ar'] ?? null,
+            'description_ar' => $job['description_ar'] ?? null,
+            'featured' => 0,
+            'highlight' => 0,
+            'is_remote' => ! empty($job['is_remote']) ? 1 : 0,
+            'status' => initialJobStatus(),
+            'job_roles' => 'public',
+            'currency' => $job['currency'] ?? 'USD',
+            'min_age' => $job['min_age'] ?? null,
+            'max_age' => $job['max_age'] ?? null,
+            'gender' => $job['gender'] ?? null,
+            'city_limit' => 0,
+            'education_limit' => empty($job['education_id']) ? 0 : 0,
+            'experience_limit' => 0,
+            'age_limit' => 0,
+            'gender_limit' => 0,
+            'ip_address' => $ip,
+            'ip_country' => $ipCountry,
+        ]);
+
+        updateMap($jobCreated);
+        finalizeJobForListing($jobCreated);
+
+        if (! empty($job['benefits'])) {
+            $this->jobBenefitsInsert($job['benefits'], $jobCreated);
+        }
+        if (! empty($job['tags'])) {
+            $this->jobTagsInsert($job['tags'], $jobCreated);
+        }
+        if (! empty($job['skills'])) {
+            $this->jobSkillsInsert($job['skills'], $jobCreated);
+        }
+
+        $user_plan = currentCompany()->userPlan()->first();
+        $user_plan->job_limit = $user_plan->job_limit - 1;
+        $user_plan->save();
+        storePlanInformation();
+
+        Notification::send(authUser(), new JobCreatedNotification($jobCreated));
+
+        if ($jobCreated->status == 'active') {
+            $candidates = CandidateJobAlert::where('job_role_id', $jobCreated->role_id)->get();
+            foreach ($candidates as $candidate) {
+                if ($candidate->candidate->received_job_alert) {
+                    $candidate->candidate->user->notify(new RelatedJobNotification($jobCreated));
+                }
+            }
+        }
+
+        if (checkMailConfig()) {
+            $admins = Admin::all();
+            foreach ($admins as $admin) {
+                Notification::send($admin, new NewJobAvailableNotification($admin, $jobCreated));
+            }
+        }
+
+        return $jobCreated;
+    }
+
+    private function resolveOrCreateJobRoleId(string $roleName): int
+    {
+        $existing = JobRoleTranslation::query()
+            ->where('job_role_id', $roleName)
+            ->orWhere('name', $roleName)
+            ->first();
+
+        if ($existing) {
+            return (int) $existing->job_role_id;
+        }
+
+        $newJobRole = JobRole::create(['name' => $roleName]);
+        $languages = loadLanguage();
+        foreach ($languages as $language) {
+            $newJobRole->translateOrNew($language->code)->name = $roleName;
+        }
+        $newJobRole->save();
+
+        return (int) $newJobRole->id;
+    }
+
+  /** @param  array<string, mixed>  $job
+   * @param  array<string, mixed>  $shared
+   */
+    private function resolveParsedDeadline(array $job, array $shared): string
+    {
+        $raw = $job['deadline'] ?? $shared['deadline'] ?? null;
+        if ($raw) {
+            try {
+                return Carbon::createFromFormat('d-m-Y', $raw)->format('Y-m-d');
+            } catch (\Throwable $e) {
+                try {
+                    return Carbon::parse($raw)->format('Y-m-d');
+                } catch (\Throwable $e) {
+                }
+            }
+        }
+
+        return Carbon::parse(now()->addDays(setting('job_deadline_expiration_limit')))->format('Y-m-d');
+    }
+
+    /** @param  array<string, mixed>  $job
+     * @param  array<string, mixed>  $shared
+     */
+    private function seedSessionLocationForParsedJob(array $job, array $shared): void
+    {
+        $country = $job['country'] ?? $shared['country'] ?? null;
+        $location = $job['location'] ?? $shared['location'] ?? $country;
+
+        if (! $location && ! $country) {
+            return;
+        }
+
+        session()->put('location', [
+            'country' => $country ?? $location,
+            'region' => $job['city'] ?? $shared['city'] ?? '',
+            'district' => '',
+            'exact_location' => (string) $location,
+            'lng' => null,
+            'lat' => null,
+        ]);
+    }
+
+    private function defaultEducationId(): int
+    {
+        $any = EducationTranslation::query()
+            ->where('name', 'like', '%Any%')
+            ->value('education_id');
+
+        if ($any) {
+            return (int) $any;
+        }
+
+        return (int) Education::query()->orderBy('id')->value('id');
+    }
+
+    private function defaultExperienceId(): int
+    {
+        $fresher = ExperienceTranslation::query()
+            ->where('name', 'like', '%Fresher%')
+            ->value('experience_id');
+
+        if ($fresher) {
+            return (int) $fresher;
+        }
+
+        return (int) Experience::query()->orderBy('id')->value('id');
+    }
+
+    private function defaultJobTypeId(): int
+    {
+        return (int) JobType::query()->orderBy('id')->value('id');
+    }
+
+    private function defaultSalaryTypeId(): int
+    {
+        $monthly = SalaryType::query()
+            ->whereHas('translations', fn ($q) => $q->where('name', 'like', '%Month%'))
+            ->value('id');
+
+        return (int) ($monthly ?: SalaryType::query()->orderBy('id')->value('id'));
+    }
+
+    /**
+     * Map industry type (form category_id) to a valid job_categories.id.
+     */
+    private function resolveJobCategoryId(mixed $categoryRequest): int
+    {
+        if ($categoryRequest === null || $categoryRequest === '') {
+            throw new \InvalidArgumentException(__('job_category_is_required'));
+        }
+
+        if (is_numeric($categoryRequest) && JobCategory::whereKey((int) $categoryRequest)->exists()) {
+            return (int) $categoryRequest;
+        }
+
+        if (is_numeric($categoryRequest)) {
+            $industry = IndustryType::find((int) $categoryRequest);
+            if ($industry) {
+                $name = trim((string) ($industry->name ?? ''));
+                if ($name !== '') {
+                    $translation = JobCategoryTranslation::where('name', $name)->first();
+                    if ($translation) {
+                        return (int) $translation->job_category_id;
+                    }
+
+                    $newJobCategory = JobCategory::create(['name' => $name]);
+                    $languages = loadLanguage();
+                    foreach ($languages as $language) {
+                        $newJobCategory->translateOrNew($language->code)->name = $name;
+                    }
+                    $newJobCategory->save();
+
+                    return (int) $newJobCategory->id;
+                }
+            }
+        }
+
+        $byName = JobCategoryTranslation::where('name', $categoryRequest)->first();
+        if ($byName) {
+            return (int) $byName->job_category_id;
+        }
+
+        $newJobCategory = JobCategory::create(['name' => (string) $categoryRequest]);
+        $languages = loadLanguage();
+        foreach ($languages as $language) {
+            $newJobCategory->translateOrNew($language->code)->name = (string) $categoryRequest;
+        }
+        $newJobCategory->save();
+
+        return (int) $newJobCategory->id;
     }
 }

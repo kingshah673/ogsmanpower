@@ -1,4 +1,3 @@
-{{-- @extends('frontend.layouts.app') --}}
 @extends('components.website.company.layout.app')
 
 @section('title')
@@ -6,173 +5,59 @@
 @endsection
 
 @section('main')
-    <div class="dashboard-wrapper">
+    <div class="dashboard-wrapper seeker-module-page">
         <div class="container">
-            <div class="row">
-                {{-- Sidebar --}}
-                {{-- <x-website.company.sidebar /> --}}
-                <div class="col-lg-9">
-                    <div class="dashboard-right">
-                        <div class="row d-flex justify-content-between p-2">
-                            <div class="col-sm-12 col-md-6">
-                                <h5 class="rt-mb-32">{{ __('all_notifications') }}</h5>
-                            </div>
-                            {{-- <div class="col-sm-12 col-md-6 d-flex justify-content-end">
-                                <div class="sidebar-open-nav ml-3">
-                                    <i class="ph-list"></i>
-                                </div>
-                            </div> --}}
-                        </div>
+            <div class="dashboard-right">
+
+                <x-website.company.employer-page-header
+                    :title="__('all_notifications')"
+                    subtitle="Applications, job updates, payments, and visa processing alerts."
+                />
+
+                <div class="glass-card"><div class="glass-card-body">
                         <div class="db-job-card-table">
                             @if ($notifications->count() > 0)
                                 @foreach ($notifications as $noti)
-                                    @if ($noti->type == 'App\Notifications\Website\Candidate\ApplyJobNotification')
-                                        <div class="card jobcardStyle1 rt-mb-12">
-                                            <div class="card-body">
+                                    @php
+                                        $data = is_array($noti->data) ? $noti->data : [];
+                                        $title = $data['title'] ?? $data['title2'] ?? $data['subject'] ?? __('notification');
+                                        $url = $data['url'] ?? $data['url2'] ?? route('company.dashboard');
+                                    @endphp
+                                    <div class="card jobcardStyle1 rt-mb-12 {{ $noti->read_at ? '' : 'border-primary' }}">
+                                        <div class="card-body">
+                                            <a href="javascript:void(0)"
+                                               onclick="readSingleNotification(@js($url), @js($noti->id))"
+                                               class="d-block text-decoration-none">
                                                 <div class="rt-single-icon-box">
+                                                    <div class="icon-thumb rt-mr-16 text-primary-500">
+                                                        <svg width="36" height="36" fill="none" stroke="currentColor"
+                                                             viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                                                        </svg>
+                                                    </div>
                                                     <div class="iconbox-content">
-                                                        <a href="{{ $noti->data['url'] }}">
-                                                            <li class="d-block">
-                                                                <div class="rt-single-icon-box">
-                                                                    <div class="icon-thumb rt-mr-16 text-primary-500">
-                                                                        <svg width="40" height="40" fill="none"
-                                                                            stroke="currentColor" viewBox="0 0 24 24"
-                                                                            xmlns="http://www.w3.org/2000/svg">
-                                                                            <path stroke-linecap="round"
-                                                                                stroke-linejoin="round" stroke-width="2"
-                                                                                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
-                                                                            </path>
-                                                                        </svg>
-                                                                    </div>
-                                                                    <div class="iconbox-content">
-                                                                        <div class="body-font-3 text-gray-700 rt-mb-4">
-                                                                            {{ $noti->data['title'] }}
-                                                                        </div>
-                                                                        <div class="body-font-4 text-gray-400">
-                                                                            {{ $noti->created_at->diffForHumans() }}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </li>
-                                                        </a>
+                                                        <div class="body-font-3 text-gray-700 rt-mb-4">{{ $title }}</div>
+                                                        <div class="body-font-4 text-gray-400">{{ $noti->created_at->diffForHumans() }}</div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </a>
                                         </div>
-                                    @endif
-                                    @if ($noti->type == 'App\Notifications\Website\Candidate\BookmarkJobNotification')
-                                        <div class="card jobcardStyle1 rt-mb-12 ">
-                                            <div class="card-body">
-                                                <div class="rt-single-icon-box ">
-                                                    <div class="iconbox-content">
-                                                        <a href="{{ $noti->data['url'] }}">
-                                                            <li class="d-block">
-                                                                <div class="rt-single-icon-box">
-                                                                    <div class="icon-thumb rt-mr-16 text-primary-500">
-                                                                        <x-svg.bookmark-icon width="40" height="40" />
-                                                                    </div>
-                                                                    <div class="iconbox-content">
-                                                                        <div class="body-font-3 text-gray-700 rt-mb-4">
-                                                                            {{ $noti->data['title'] }}
-                                                                        </div>
-                                                                        <div class="body-font-4 text-gray-400">
-                                                                            {{ $noti->created_at->diffForHumans() }}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </li>
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endif
-                                    @if ($noti->type == 'App\Notifications\Website\Company\JobCreatedNotification' || $noti->type == 'App\Notifications\Website\Company\EditApproveNotification' || $noti->type == 'App\Notifications\Website\Company\JobDeletedNotification')
-                                        <div class="card jobcardStyle1 rt-mb-12 ">
-                                            <div class="card-body">
-                                                <div class="rt-single-icon-box ">
-                                                    <div class="iconbox-content">
-                                                        <a href="{{ $noti->data['url'] }}">
-                                                            <li class="d-block">
-                                                                <div class="rt-single-icon-box">
-                                                                    <div class="icon-thumb rt-mr-16 text-primary-500">
-                                                                        <svg width="40" height="40" fill="none"
-                                                                            stroke="currentColor" viewBox="0 0 24 24"
-                                                                            xmlns="http://www.w3.org/2000/svg">
-                                                                            <path stroke-linecap="round"
-                                                                                stroke-linejoin="round" stroke-width="2"
-                                                                                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
-                                                                            </path>
-                                                                        </svg>
-                                                                    </div>
-                                                                    <div class="iconbox-content">
-                                                                        <div class="body-font-3 text-gray-700 rt-mb-4">
-                                                                            {{ $noti->data['title'] }}
-                                                                        </div>
-                                                                        <div class="body-font-4 text-gray-400">
-                                                                            {{ $noti->created_at->diffForHumans() }}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </li>
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endif
-                                    @if ($noti->type == 'App\Notifications\JobApprovalNotification')
-                                        <div class="card jobcardStyle1 rt-mb-12 ">
-                                            <div class="card-body">
-                                                <div class="rt-single-icon-box ">
-                                                    <div class="iconbox-content">
-                                                        <a href="{{ $noti->data['url'] }}">
-                                                            <li class="d-block">
-                                                                <div class="rt-single-icon-box">
-                                                                    <div class="icon-thumb rt-mr-16 text-primary-500">
-                                                                        <svg width="40" height="40" fill="none"
-                                                                            stroke="currentColor" viewBox="0 0 24 24"
-                                                                            xmlns="http://www.w3.org/2000/svg">
-                                                                            <path stroke-linecap="round"
-                                                                                stroke-linejoin="round" stroke-width="2"
-                                                                                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
-                                                                            </path>
-                                                                        </svg>
-                                                                    </div>
-                                                                    <div class="iconbox-content">
-                                                                        <div class="body-font-3 text-gray-700 rt-mb-4">
-                                                                            {{ $noti->data['title'] }}
-                                                                        </div>
-                                                                        <div class="body-font-4 text-gray-400">
-                                                                            {{ $noti->created_at->diffForHumans() }}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </li>
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endif
+                                    </div>
                                 @endforeach
                             @else
                                 <x-not-found message="{{ __('no_data_found') }}" />
                             @endif
                         </div>
                         <div class="rt-pt-12">
-                            @if ($notifications->total() > $notifications->count())
+                            @if ($notifications->hasPages())
                                 <nav>
                                     {{ $notifications->links('vendor.pagination.frontend') }}
                                 </nav>
                             @endif
                         </div>
-                    </div>
-                </div>
+                    </div></div>
             </div>
-        </div>
-        <div class="dashboard-footer text-center body-font-4 text-gray-500">
-            {{-- <x-website.footer-copyright /> --}}
         </div>
     </div>
 @endsection

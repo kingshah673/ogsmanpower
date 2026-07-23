@@ -1,0 +1,407 @@
+/**
+ * Candidate profile view — matches settings page (Inter, slate, glass cards)
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --bg-page: #f8fafc;
+    --color-slate-50: #f8fafc;
+    --color-slate-100: #f1f5f9;
+    --color-slate-200: #e2e8f0;
+    --color-slate-300: #cbd5e1;
+    --color-slate-400: #94a3b8;
+    --color-slate-500: #64748b;
+    --color-slate-600: #475569;
+    --color-slate-700: #334155;
+    --color-slate-800: #1e293b;
+    --color-slate-900: #0f172a;
+    --color-primary: #2563eb;
+    --color-primary-hover: #1d4ed8;
+    --color-success: #059669;
+    --color-warning: #d97706;
+    --color-danger: #dc2626;
+}
+
+.seeker-profile-page {
+    font-family: var(--font-primary);
+    color: var(--color-slate-800);
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 3rem;
+}
+
+.seeker-profile-page .container {
+    max-width: 960px;
+}
+
+.seeker-profile-page .cw-settings-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.seeker-profile-page .cw-settings-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+}
+
+.seeker-profile-page .cw-settings-header p {
+    font-size: 0.875rem;
+    color: var(--color-slate-600);
+    margin: 0;
+}
+
+.seeker-profile-page .pv-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.seeker-profile-page .pv-topbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 6px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.seeker-profile-page .pv-topbar-btn:hover {
+    background: var(--color-slate-50);
+    border-color: var(--color-slate-300);
+    color: var(--color-slate-900);
+    text-decoration: none;
+}
+
+.seeker-profile-page .pv-topbar-btn--primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+.seeker-profile-page .pv-topbar-btn--primary:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+    color: #fff;
+}
+
+/* Hero card */
+.seeker-profile-page .profile-hero {
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.seeker-profile-page .profile-hero__photo {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--color-slate-100);
+    flex-shrink: 0;
+}
+
+.seeker-profile-page .profile-hero__name {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+}
+
+.seeker-profile-page .profile-hero__title {
+    font-size: 0.9375rem;
+    color: var(--color-slate-600);
+    margin: 0 0 0.75rem;
+}
+
+.seeker-profile-page .profile-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.seeker-profile-page .profile-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 999px;
+    background: var(--color-slate-100);
+    color: var(--color-slate-700);
+}
+
+.seeker-profile-page .profile-badge--success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.seeker-profile-page .profile-badge--muted {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Section cards — same family as settings glass-card */
+.seeker-profile-page .glass-card {
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 12px;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.seeker-profile-page .glass-card-body {
+    padding: 1.25rem 1.5rem;
+}
+
+.seeker-profile-page .glass-card h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+    margin: 0 0 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-slate-100);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.seeker-profile-page .glass-card h3 i {
+    color: var(--color-primary);
+    font-size: 0.875rem;
+}
+
+/* Read-only field grid — mirrors settings form layout */
+.seeker-profile-page .pv-field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem 1.25rem;
+}
+
+@media (max-width: 640px) {
+    .seeker-profile-page .pv-field-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.seeker-profile-page .pv-field-grid--full {
+    grid-template-columns: 1fr;
+}
+
+.seeker-profile-page .pv-readonly-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.seeker-profile-page .pv-readonly-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-slate-500);
+    margin: 0;
+}
+
+.seeker-profile-page .pv-readonly-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-slate-800);
+    background: var(--color-slate-50);
+    border: 1px solid var(--color-slate-200);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    min-height: 2.25rem;
+    line-height: 1.4;
+}
+
+.seeker-profile-page .pv-readonly-value--danger {
+    color: var(--color-danger);
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+.seeker-profile-page .pv-readonly-value--warning {
+    color: var(--color-warning);
+    border-color: #fde68a;
+    background: #fffbeb;
+}
+
+.seeker-profile-page .pv-bio-block {
+    font-size: 0.875rem;
+    line-height: 1.7;
+    color: var(--color-slate-700);
+    background: var(--color-slate-50);
+    border: 1px solid var(--color-slate-200);
+    border-radius: 8px;
+    padding: 1rem 1.125rem;
+}
+
+/* Tags */
+.seeker-profile-page .pv-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.seeker-profile-page .pv-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-slate-700);
+    background: var(--color-slate-50);
+    border: 1px solid var(--color-slate-200);
+    border-radius: 6px;
+}
+
+/* Data table */
+.seeker-profile-page .pv-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 8px;
+}
+
+.seeker-profile-page .pv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    min-width: 480px;
+}
+
+.seeker-profile-page .pv-table thead th {
+    background: var(--color-slate-50);
+    color: var(--color-slate-600);
+    font-weight: 600;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.625rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-slate-200);
+}
+
+.seeker-profile-page .pv-table tbody td {
+    padding: 0.75rem 1rem;
+    color: var(--color-slate-800);
+    border-bottom: 1px solid var(--color-slate-100);
+    vertical-align: top;
+}
+
+.seeker-profile-page .pv-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Social links */
+.seeker-profile-page .pv-socials {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.seeker-profile-page .pv-social-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.4rem 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-primary);
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    text-decoration: none;
+}
+
+.seeker-profile-page .pv-social-link:hover {
+    background: #dbeafe;
+    text-decoration: none;
+    color: var(--color-primary-hover);
+}
+
+/* Document preview */
+.seeker-profile-page .pv-doc-preview {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-slate-100);
+}
+
+.seeker-profile-page .pv-doc-img {
+    max-width: 280px;
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--color-slate-200);
+    object-fit: contain;
+}
+
+.seeker-profile-page .pv-empty-note {
+    font-size: 0.8125rem;
+    color: var(--color-slate-400);
+    font-style: italic;
+    margin: 0;
+}
+
+/* Print */
+@media print {
+    .main-sidebar,
+    .main-header,
+    .main-footer,
+    nav,
+    .seeker-profile-page .pv-actions,
+    .seeker-profile-page .pv-topbar-btn,
+    .no-print {
+        display: none !important;
+    }
+
+    body,
+    .content-wrapper {
+        background: #fff !important;
+    }
+
+    .seeker-profile-page {
+        padding: 0;
+    }
+
+    .seeker-profile-page .container {
+        max-width: 100%;
+        padding: 0;
+    }
+
+    .seeker-profile-page .glass-card,
+    .seeker-profile-page .profile-hero {
+        box-shadow: none;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        border: 1px solid #ddd;
+        margin-bottom: 0.75rem;
+    }
+
+    .seeker-profile-page .pv-readonly-value {
+        background: #f9fafb;
+        border-color: #e5e7eb;
+    }
+}

@@ -5,7 +5,7 @@ namespace App\Http\Traits;
 use App\Models\Candidate;
 use App\Models\Education;
 use App\Models\Experience;
-use App\Models\SkillTranslation;
+use App\Models\Skill;
 use App\Models\User;
 
 trait CandidateAble
@@ -100,13 +100,20 @@ trait CandidateAble
 
         // skills filter
         if ($request->has('skills') && $request->skills != null) {
-            $skills = $request->skills;
-            $skills = SkillTranslation::where('name', $request->skills)->first();
+            $skillNames = array_filter((array) $request->skills);
 
-            if ($skills) {
-                $query->whereHas('skills', function ($q) use ($skills) {
-                    $q->whereIn('candidate_skill.skill_id', $skills);
-                });
+            if (! empty($skillNames)) {
+                $skillIds = Skill::query()
+                    ->whereHas('translations', function ($q) use ($skillNames) {
+                        $q->whereIn('name', $skillNames);
+                    })
+                    ->pluck('id');
+
+                if ($skillIds->isNotEmpty()) {
+                    $query->whereHas('skills', function ($q) use ($skillIds) {
+                        $q->whereIn('skills.id', $skillIds);
+                    });
+                }
             }
         }
 

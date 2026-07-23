@@ -22,7 +22,7 @@ trait JobableApi
     {
         if (auth('sanctum')->user()) {
 
-            $query = Job::with('company.user', 'category', 'job_type:id,name')
+            $query = Job::with('company.user', 'category', 'job_type')
                 ->withCount([
                     'bookmarkJobs', 'appliedJobs',
                     'bookmarkJobs as bookmarked' => function ($q) {
@@ -34,7 +34,7 @@ trait JobableApi
                 ->active()->withoutEdited();
         } else {
 
-            $query = Job::with('company.user', 'category', 'job_type:id,name')
+            $query = Job::with('company.user', 'category', 'job_type')
                 ->withCount([
                     'bookmarkJobs', 'appliedJobs',
                     'bookmarkJobs as bookmarked' => function ($q) {
@@ -46,6 +46,8 @@ trait JobableApi
                 ->withoutEdited()
                 ->active();
         }
+
+        $query = applyCandidateAgeFilter($query);
 
         // company search
         if ($request->has('company') && $request->company != null) {
@@ -161,7 +163,7 @@ trait JobableApi
 
         // Job type filter
         if ($request->has('job_type') && $request->job_type != null) {
-            $job_type_id = JobType::where('name', $request->job_type)->value('id');
+            $job_type_id = JobType::whereTranslation('name', $request->job_type)->value('id');
             $query->where('job_type_id', $job_type_id);
         }
 
@@ -222,7 +224,9 @@ trait JobableApi
 
         // Related Jobs With Single && Multiple Country Base
         if (auth('sanctum')->user()) {
-            $related_jobs_query = Job::query()->withoutEdited()->active()->where('id', '!=', $job->id)->where('category_id', $job->category_id);
+            $related_jobs_query = applyCandidateAgeFilter(
+                Job::query()->withoutEdited()->active()->where('id', '!=', $job->id)->where('category_id', $job->category_id)
+            );
             $setting = Setting::first();
             if ($setting->app_country_type == 'single_base') {
                 if ($setting->app_country) {

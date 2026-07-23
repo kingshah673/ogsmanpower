@@ -61,7 +61,17 @@ class MenuController extends Controller
 
             flashSuccess(__('menu_updated_successfully'));
 
-            return redirect()->route('menu-settings.index');
+            $redirect = route('menu-settings.index');
+            if ($request->query('for')) {
+                $redirect .= '?for='.$request->query('for');
+            } elseif ($menuSetting->for) {
+                $for = json_decode($menuSetting->for, true);
+                if (is_array($for) && count($for) === 1) {
+                    $redirect .= '?for='.$for[0];
+                }
+            }
+
+            return redirect($redirect);
         } catch (\Throwable $th) {
             flashError($th->getMessage());
 

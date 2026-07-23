@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Candidate;
 use App\Models\Company;
+use App\Models\Agency;
 use App\Models\Earning;
 use App\Models\Job;
 use App\Models\User;
@@ -63,6 +64,7 @@ class AdminController extends Controller
         return view('backend.home');
     }
 
+
     /*
     * Show the application dashboard.
     *
@@ -80,6 +82,9 @@ class AdminController extends Controller
         $data['verified_users'] = User::whereNotNull('email_verified_at')->count();
         $data['candidates'] = Candidate::all()->count();
         $data['companies'] = Company::all()->count();
+        $data['agencies'] = \App\Models\Agency::query()->count();
+        $data['agents'] = User::query()->where('role', 'agent')->count();
+        $data['brokers'] = \App\Models\Broker::query()->count();
         $data['earnings'] = currencyConversion(Earning::sum('usd_amount'));
         $data['email_verification'] = setting('email_verification');
 
@@ -106,7 +111,17 @@ class AdminController extends Controller
 
         $current_currency = currentCurrency();
 
-        return view('backend.index', compact('data', 'earnings', 'popular_countries', 'latest_jobs', 'latest_earnings', 'users', 'current_currency'));
+        // Plan feature limits belong to company/agency Users, not Admin — do not call them here.
+
+        return view('backend.index', compact(
+            'data',
+            'earnings',
+            'popular_countries',
+            'latest_jobs',
+            'latest_earnings',
+            'users',
+            'current_currency'
+        ));
     }
 
     /*

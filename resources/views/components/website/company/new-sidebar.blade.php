@@ -14,84 +14,35 @@
     <meta property="og:image" content="@yield('og:image')">
     <script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
         crossorigin="anonymous"></script>
-    {{-- <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" /> --}}
-    <script src="{{ asset('backend/plugins/jquery/jquery.min.js') }}"></script>
-    <script src="{{ asset('backend/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ asset('backend/plugins/toastr/toastr.min.js') }}"></script>
-    <script src="{{ asset('backend/js/ckeditor.js') }}"></script>
-    <script src="{{ asset('backend/js/livewire.js') }}"></script>
-    <script src="{{ asset('backend/js/adminlte.min.js') }}"></script>
-    <script src='https://www.google.com/recaptcha/api.js'></script>
-    <script src="{{ asset('frontend') }}/assets/js/axios.min.js"></script>
-    <script src="{{ asset('backend/plugins/select2/js/select2.full.min.js') }}"></script>
-    <script src="{{ asset('frontend/assets/js/bootstrap-datepicker.min.js') }}"></script>
-    <script src="{{ asset('backend') }}/plugins/bootstrap-switch/js/bootstrap-switch.min.js"></script>
-    <script src="{{ asset('backend') }}/plugins/dropify/js/dropify.min.js"></script>
-    <title>@yield('title') - {{ config('app.name') }}</title>
 
     @yield('ld-data')
 
     {{-- Style --}}
     @include('frontend.partials.styles')
-    {{-- @include('frontend.partials.preloader') --}}
+    <link rel="stylesheet" href="{{ asset('css/candidate-seeker-common.css') }}?v={{ @filemtime(public_path('css/candidate-seeker-common.css')) ?: '1' }}">
+    <link rel="stylesheet" href="{{ asset('css/candidate-settings-classic.css') }}?v={{ @filemtime(public_path('css/candidate-settings-classic.css')) ?: '1' }}">
     @yield('css')
 
     {{-- Custome css and js  --}}
     {!! $setting->header_css !!}
     {!! $setting->header_script !!}
     @include('backend.layouts.partials.styles')
+    <script src="{{ asset('backend/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ asset('backend/plugins/toastr/toastr.min.js') }}"></script>
+    <script src="{{ asset('backend/js/livewire.js') }}"></script>
+    <script src="{{ asset('backend/js/adminlte.min.js') }}"></script>
+    @unless (request()->routeIs('candidate.*', 'company.*', 'agency.*', 'agent.*'))
+    <script src='https://www.google.com/recaptcha/api.js'></script>
+    @endunless
+    <script src="{{ asset('frontend') }}/assets/js/axios.min.js"></script>
+    <script src="{{ asset('backend/plugins/select2/js/select2.full.min.js') }}"></script>
+    <script src="{{ asset('frontend/assets/js/bootstrap-datepicker.min.js') }}"></script>
+    <script src="{{ asset('backend') }}/plugins/bootstrap-switch/js/bootstrap-switch.min.js"></script>
+    <script src="{{ asset('backend') }}/plugins/dropify/js/dropify.min.js"></script>
 </head>
 
 <style>
-    .title {
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 1.5rem;
-        width: auto;
-        /* Ensure it takes full width to center */
-        position: absolute;
-        /* Remove it from the normal document flow */
-        left: 45%;
-        /* Align to the middle horizontally */
-        transform: translateX(-50%);
-        /* Adjust for center alignment */
-        z-index: -2;
-        /* Make sure it stays on top */
-        margin: initial
-    }
-
-    /* Media query to hide the title on screens smaller than 1024px width or 309px height */
-    @media (max-width: 1024px),
-    (max-height: 309px) {
-        .title {
-            color: white;
-            display: flex;
-            align-items: center;
-            /* justify-content: center; */
-            font-weight: bold;
-            font-size: 1rem;
-            width: auto;
-            /* Ensure it takes full width to center */
-            position: absolute;
-            /* Remove it from the normal document flow */
-            left: 41%;
-            /* Align to the middle horizontally */
-            transform: translateX(-50%);
-            z-index: 1;
-            /* Make sure it stays on top */
-            margin: initial
-        }
-    }
-
-    @media (max-width: 426px),
-    (max-height: 309px) {
-        .title {
-            display: none;
-        }
-    }
+    /* Employer portal uses shared candidate-seeker-common.css for navbar + notifications */
 </style>
 
 <body class="hold-transition sidebar-mini layout-fixed {{ $setting->dark_mode ? 'dark-mode' : '' }}"
@@ -104,33 +55,31 @@
     @endphp
     <div class="wrapper">
         <!-- Navbar -->
-        <nav id="nav"
-            class="main-header navbar navbar-expand {{ $setting->dark_mode ? 'navbar-dark navbar-dark' : 'navbar-white navbar-light' }}">
-            <!-- Left navbar links -->
+        <nav id="nav" class="main-header navbar navbar-expand navbar-dark">
             <ul class="navbar-nav">
-                <li class="nav-item ">
-                    <a id="nav_collapse" class="nav-link" data-widget="pushmenu" href="#" role="button"
-                        style="color: white"><i class="fas fa-bars"></i></a>
+                <li class="nav-item">
+                    <a id="nav_collapse" class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
                 </li>
             </ul>
 
-            <!-- Centered title -->
-            <span class="title "> OGS MANPOWER COMPANY PORTAL</span>
+            <span class="cw-portal-title">OGS MANPOWER Employer Portal</span>
             <ul class="navbar-nav ml-auto">
                 @auth('user')
-                    <ul class="list-unstyled tw-gap-6 d-flex ">
-                        <li style="margin-top:5px;">
-                            <a title="{{ __('browse_website') }}" target="_blank" class="nav-link" style="color: white;"
+                    <ul class="cw-nav-actions">
+                        <li>
+                            <a title="{{ __('browse_website') }}" target="_blank" class="nav-link"
                                 href="{{ url('/') }}">
-                                <i class="fas fa-globe fa-2"></i>
+                                <i class="fas fa-globe"></i>
                             </a>
                         </li>
 
-                        @if (auth()->user()->role == 'candidate')
+                        @if (auth()->user()->role == 'company')
+                            <x-website.company.notifications-component />
+                        @elseif (auth()->user()->role == 'candidate')
                             <x-website.candidate.notifications-component />
                         @endif
 
-                        <div class="dropdown dropstart">
+                        <li class="dropdown dropstart">
                             <a href="javascript:void(0)" class="candidate-profile position-relative"
                                 id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                                 @company
@@ -222,7 +171,7 @@
                                 </li>
                             </ul>
                             @endcandidate
-                        </div>
+                        </li>
                         @if (!request()->is('email/verify'))
                             @company
                                 <li class="tw-hidden sm:tw-block">
@@ -265,7 +214,7 @@
                 <div class="container-fluid">
                     @yield('main')
                     <!-- /.row -->
-                    @include('frontend.partials.scripts')
+                    @include('frontend.partials.scripts', ['dashboard_layout' => true])
 
                     <!-- Custom js -->
                     {!! $setting->body_script !!}
@@ -299,7 +248,10 @@
     </script>
     <script>
         window.onload = function() {
-            document.querySelector('.preloader').style.display = 'none';
+            var preloader = document.querySelector('.preloader');
+            if (preloader) {
+                preloader.style.display = 'none';
+            }
         };
     </script>
     @if ($setting->pwa_enable)
@@ -321,19 +273,27 @@
             });
 
             const installApp = document.getElementById('installApp');
-            installApp.addEventListener('click', async () => {
-                if (deferredPrompt !== null) {
-                    deferredPrompt.prompt();
-                    const {
-                        outcome
-                    } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') {
-                        deferredPrompt = null;
+            if (installApp) {
+                installApp.addEventListener('click', async () => {
+                    if (deferredPrompt !== null) {
+                        deferredPrompt.prompt();
+                        const {
+                            outcome
+                        } = await deferredPrompt.userChoice;
+                        if (outcome === 'accepted') {
+                            deferredPrompt = null;
+                        }
                     }
-                }
-            });
+                });
+            }
         </script>
     @endif
+
+    @yield('script')
+    @stack('script')
+
+    @include('frontend.partials.sophia-widget')
+
 </body>
 
 </html>

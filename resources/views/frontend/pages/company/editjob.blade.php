@@ -57,24 +57,15 @@
                                     </div> --}}
                                     <div class="col-lg-8 rt-mb-20">
                                         <x-forms.label name="job_title" :required="true" class="tw-text-sm tw-mb-2" />
-                                        <select id="" name="title" class="rt-selectactive form-control"
-                                            onchange="toggleCustomInput(this)">
-                                            <option value="" disabled selected>Select one</option>
-                                            <option value="custom">Custom Option</option>
-                                            @if ($job->title)
-                                                {
-                                                <option value="{{ $job->title }}" selected>{{ $job->title }}
-                                                </option>
-                                                }
+                                        <select name="title" class="cw-ms-select form-control"
+                                            data-cw-lookup="professions"
+                                            data-cw-value="text"
+                                            data-cw-tags="1"
+                                            data-placeholder="Search job title…">
+                                            @if (old('title', $job->title ?? null))
+                                                <option value="{{ old('title', $job->title) }}" selected>{{ old('title', $job->title) }}</option>
                                             @endif
-                                            @foreach ($jobtitles as $jobtitle)
-                                                <option {{ $job->title == $jobtitle->name ? 'selected' : '' }}
-                                                    value="{{ $jobtitle->name }}">{{ $jobtitle->name }}
-                                                </option>
-                                            @endforeach
                                         </select>
-                                        <input type="text" id="custom_product" name="custom_title"
-                                            placeholder="Enter custom title" style="display:none;">
                                         @error('title')
                                             <span class="error invalid-feedback">{{ $message }}</span>
                                         @enderror
@@ -82,12 +73,19 @@
                                     <div class="col-lg-4 rt-mb-20 col-md-4">
                                         <x-forms.label name="Industry" :required="true" />
                                         <select
-                                            class=" select2-taggable form-control @error('category_id') is-invalid @enderror"
-                                            name="category_id">
-                                            @foreach ($jobCategories as $category)
-                                                <option {{ $job->category_id == $category->id ? 'selected' : '' }}
-                                                    value="{{ $category->id }}">{{ $category->name }}</option>
-                                            @endforeach
+                                            class="cw-ms-select form-control @error('category_id') is-invalid @enderror"
+                                            name="category_id"
+                                            data-cw-lookup="industries"
+                                            data-placeholder="Search industry…">
+                                            @php
+                                                $selectedCategoryId = old('category_id', $job->category_id ?? null);
+                                                $selectedCategory = $selectedCategoryId
+                                                    ? ($jobCategories->firstWhere('id', (int) $selectedCategoryId) ?? null)
+                                                    : null;
+                                            @endphp
+                                            @if ($selectedCategory)
+                                                <option value="{{ $selectedCategory->id }}" selected>{{ $selectedCategory->name }}</option>
+                                            @endif
                                         </select>
                                         @error('category_id')
                                             <span class="error invalid-feedback">{{ $message }}</span>
@@ -97,9 +95,10 @@
                                         <x-forms.label name="tags" :required="false" class="tw-text-sm tw-mb-2">
                                             ({{ __('saerch_or_write_tag_and_hit_enter') }})
                                         </x-forms.label>
-                                        <select
-                                            class=" rt-selectactive select2-taggable form-control @error('tags') is-invalid @enderror"
-                                            name="tags[]" multiple>
+                                        <select id="tagsSelect"
+                                            class="cw-ms-select form-control @error('tags') is-invalid @enderror"
+                                            name="tags[]" multiple
+                                            data-cw-lookup="tags" data-cw-tags="1" data-placeholder="Search or add tags…">
                                             @foreach ($tags as $tag)
                                                 <option
                                                     @foreach ($job->tags as $job_tag)
@@ -114,12 +113,17 @@
                                     <div class="col-lg-4 rt-mb-20 col-md-4">
                                         <x-forms.label name="job_role" :required="true" class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class=" select2-taggable form-control @error('role_id') is-invalid @enderror"
-                                            name="role_id">
-                                            @foreach ($roles as $role)
-                                                <option {{ $job->role_id == $role->id ? 'selected' : '' }}
-                                                    value="{{ $role->id }}">{{ $role->name }}</option>
-                                            @endforeach
+                                            class="cw-ms-select form-control @error('role_id') is-invalid @enderror"
+                                            name="role_id" data-cw-lookup="job_roles" data-placeholder="Select job role…">
+                                            @php
+                                                $selectedRoleId = old('role_id', $job->role_id ?? null);
+                                                $selectedRole = $selectedRoleId
+                                                    ? ($roles->firstWhere('id', (int) $selectedRoleId) ?? null)
+                                                    : null;
+                                            @endphp
+                                            @if ($selectedRole)
+                                                <option value="{{ $selectedRole->id }}" selected>{{ $selectedRole->name }}</option>
+                                            @endif
                                         </select>
                                         @error('role_id')
                                             <span class="error invalid-feedback">{{ $message }}</span>
@@ -211,7 +215,7 @@
                                         <x-forms.label name="{{ __('salary_type') }}" :required="true"
                                             class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class="rt-selectactive form-control @error('salary_type') is-invalid @enderror "
+                                            class="cw-static-select form-control @error('salary_type') is-invalid @enderror "
                                             name="salary_type">
                                             @foreach ($salary_types as $type)
                                                 <option {{ $job->salary_type_id == $type->id ? 'selected' : '' }}
@@ -232,7 +236,7 @@
                                     <div class="col-lg-4 col-md-6 rt-mb-20">
                                         <x-forms.label name="education" :required="true" class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class="select2-taggable form-control @error('education') is-invalid @enderror "
+                                            class="cw-static-select form-control @error('education') is-invalid @enderror "
                                             name="education">
                                             @foreach ($educations as $education)
                                                 <option {{ $job->education_id == $education->id ? 'selected' : '' }}
@@ -252,7 +256,7 @@
                                     <div class="col-lg-4 col-md-6 rt-mb-20">
                                         <x-forms.label name="experience" :required="true" class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class="select2-taggable form-control @error('experience') is-invalid @enderror "
+                                            class="cw-static-select form-control @error('experience') is-invalid @enderror "
                                             name="experience">
                                             @foreach ($experiences as $experience)
                                                 <option {{ $job->experience_id == $experience->id ? 'selected' : '' }}
@@ -272,7 +276,7 @@
                                     <div class="col-lg-4 col-md-6 rt-mb-20">
                                         <x-forms.label name="job_type" :required="true" class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class="rt-selectactive form-control @error('job_type') is-invalid @enderror "
+                                            class="cw-static-select form-control @error('job_type') is-invalid @enderror "
                                             name="job_type">
                                             @foreach ($job_types as $job_type)
                                                 <option {{ $job->job_type_id == $job_type->id ? 'selected' : '' }}
@@ -287,7 +291,7 @@
                                     </div>
                                     <div class="col-md-6">
                                         <x-forms.label name="Minimum Age" for="min_age" />
-                                        <select name="min_age" class="form-control select2bs4 " id="min_age">
+                                        <select name="min_age" class="cw-static-select form-control" id="min_age">
                                             @if ($job->min_age)
                                                 {
                                                 <option value="{{ $job->min_age }}" selected>{{ $job->min_age }}</option>
@@ -310,7 +314,7 @@
                                     <div class="col-md-6">
                                         <x-forms.label name="Maximum Age" for="max_age" />
                                         <select name="max_age"
-                                            class="form-control select2bs4 @error('max_age') is-invalid @enderror"
+                                            class="cw-static-select form-control @error('max_age') is-invalid @enderror"
                                             id="max_age">
                                             @if ($job->max_age)
                                                 {
@@ -339,7 +343,7 @@
                                     </div>
                                     <div class="col-md-6">
                                         <x-forms.label name="gender" for="gender" />
-                                        <select name="gender" class="form-control select2bs4" id="gender">
+                                        <select name="gender" class="cw-static-select form-control" id="gender">
                                             <option value="" selected disabled>Select Gender </option>
                                             <option value="male" @if ($job->gender == 'male') selected @endif>Male
                                             </option>
@@ -522,8 +526,8 @@
                                 <div class="form-group">
                                     <x-forms.label name="skills" :required="false" />
                                     <select id="skills" name="skills[]"
-                                        class="select2-taggable form-control @error('skills') is-invalid @enderror"
-                                        multiple>
+                                        class="cw-ms-select form-control @error('skills') is-invalid @enderror" multiple
+                                        data-cw-lookup="skills" data-cw-tags="1" data-placeholder="Search or add skills…">
                                         @foreach ($skills as $skill)
                                             <option
                                                 @foreach ($job->skills as $job_skill)
@@ -567,6 +571,44 @@
                                 <div class="col-md-12">
                                     <textarea id="image_ckeditor" class="form-control @error('description') is-invalid @enderror" name="description">{{ $job->description }}</textarea>
                                     @error('description')
+                                        <span class="error invalid-feedback">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            {{-- Arabic / Bilingual Fields --}}
+                            <div class="post-job-item rt-mb-15">
+                                <h4 class="f-size-18 ft-wt-5 tw-mb-3 lh-1">
+                                    العنوان بالعربية
+                                    <small class="text-muted fw-normal" style="font-size:13px">(Arabic Job Title — Optional)</small>
+                                </h4>
+                                <div class="col-md-12">
+                                    <input type="text"
+                                           name="title_ar"
+                                           value="{{ old('title_ar', $job->title_ar) }}"
+                                           class="form-control @error('title_ar') is-invalid @enderror"
+                                           placeholder="مثال: مهندس برمجيات"
+                                           dir="rtl"
+                                           style="text-align:right">
+                                    @error('title_ar')
+                                        <span class="error invalid-feedback">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            <div class="post-job-item rt-mb-32">
+                                <h4 class="f-size-18 ft-wt-5 tw-mb-3 lh-1">
+                                    وصف الوظيفة بالعربية
+                                    <small class="text-muted fw-normal" style="font-size:13px">(Arabic Description — Optional)</small>
+                                </h4>
+                                <div class="col-md-12">
+                                    <textarea name="description_ar"
+                                              class="form-control @error('description_ar') is-invalid @enderror"
+                                              rows="6"
+                                              dir="rtl"
+                                              style="text-align:right; font-family:inherit"
+                                              placeholder="اكتب وصف الوظيفة باللغة العربية هنا...">{{ old('description_ar', $job->description_ar) }}</textarea>
+                                    @error('description_ar')
                                         <span class="error invalid-feedback">{{ $message }}</span>
                                     @enderror
                                 </div>
@@ -844,43 +886,23 @@
 @endsection
 
 @section('frontend_scripts')
+<script>window.cwSettingsLookupUrl = @json(url('/company/job-form/lookup'));</script>
+<script src="{{ asset('js/candidate-settings-select2.js') }}?v={{ @filemtime(public_path('js/candidate-settings-select2.js')) ?: '1' }}"></script>
 <script>
     function toggleCustomInput(select) {
         const customInput = document.getElementById('custom_product');
+        if (!customInput) return;
         if (select.value === 'custom') {
             customInput.style.display = 'block';
-            customInput.value = ''; // Clear the custom input if 'Custom Option' is selected
+            customInput.value = '';
         } else {
             customInput.style.display = 'none';
-            customInput.value = ''; // Clear the custom input if another option is selected
+            customInput.value = '';
         }
     }
 </script>
-    <script>
-        .create(document.querySelector('#image_ckeditor'))
-            .then(editor => {
-                editor.model.document.on('change:data', () => {
-                    const content = editor.getData();
-
-                    // Regular expression to match numbers and email addresses
-                    const invalidPattern = /\b\d+\b|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-
-                    if (invalidPattern.test(content)) {
-                        // Remove invalid content
-                        const sanitizedContent = content.replace(invalidPattern, '');
-                        editor.setData(sanitizedContent);
-
-                        // Optionally, display a warning message
-                        alert("Numbers or email addresses are not allowed in the description.");
-                    }
-                });
-            })
-            .catch(error => {
-                console.error('Error initializing CKEditor:', error);
-            });
-    </script>
+    {{-- CKEditor initialized in frontend/partials/scripts.blade.php (#image_ckeditor) --}}
     @livewireScripts
-    <script defer src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
         $(document).ready(function() {
             $('.select21').select2();
@@ -1011,10 +1033,17 @@
 
 
     @if (app()->getLocale() == 'ar')
-        <script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.ar.min.js
-                                                    "></script>
+        <script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.ar.min.js"></script>
     @endif
-    @include('map::set-edit-leafletmap', ['lat' => $job->lat, 'long' => $job->long])
+
+    @if (config('templatecookie.map_show'))
+        @php $activeMap = $map ?? ($setting->default_map ?? 'leaflet'); @endphp
+        @if ($activeMap === 'leaflet')
+            @include('map::set-edit-leafletmap', ['lat' => $job->lat, 'long' => $job->long])
+        @elseif ($activeMap === 'google-map' && filled($setting->google_map_key))
+            @include('map::set-edit-googlemap', ['job' => $job])
+        @endif
+    @endif
 
     <script>
         var start_day = '{{ $start_day }}'
@@ -1036,8 +1065,6 @@
             }
         );
     </script>
-
-    @include('map::set-edit-googlemap', ['job' => $job])
 
     <script>
         var salary_mode = "{!! old('salary_mode', $job->salary_mode) !!}";

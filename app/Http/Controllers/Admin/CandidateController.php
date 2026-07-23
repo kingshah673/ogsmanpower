@@ -46,8 +46,8 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use PDF;
 use Mpdf\Mpdf;
 use PDO;
+use App\Services\CandidateResumeViewService;
 use Twilio\Rest\Client;
-use Stichoza\GoogleTranslate\GoogleTranslate;
 
 class CandidateController extends Controller
 {
@@ -81,8 +81,7 @@ class CandidateController extends Controller
     }
     public function editPlan()
     {
-        $plan = CandidatePlan::first();
-
+        $plan = candidateFeaturedPlan();
 
         return view('backend.candidate.edit-candidate-plan', compact('plan'));
     }
@@ -94,6 +93,10 @@ class CandidateController extends Controller
             'price' => 'required|numeric|min:0',
             'duration' => 'required|integer|min:1',
         ]);
+
+        if (! \Illuminate\Support\Facades\Schema::hasTable('candidate_plans')) {
+            return redirect()->back()->with('error', 'Candidate plans table is missing. Please run database migrations.');
+        }
 
         // Fetch the first plan or create one if it doesn't exist
         $plan = CandidatePlan::firstOrCreate(
@@ -219,197 +222,225 @@ class CandidateController extends Controller
         return back()->with('success', 'Candidate deleted successfully.');
     }
 
+    public function seekerDynamicInputs()
+    {
+        abort_if(
+            ! auth()->user()->hasRole('superadmin')
+            && ! userCan('candidate.update')
+            && ! userCan('candidate.create'),
+            403
+        );
+
+        $sections = \App\Services\DynamicFieldService::seekerSections();
+        $attributes = \App\Services\DynamicFieldService::seekerDefinitions();
+        $groupedSections = \App\Services\DynamicFieldService::groupBySections($attributes, $sections, 'basic-info');
+
+        return view('backend.candidate.seeker-dynamic-inputs', compact('attributes', 'sections', 'groupedSections'));
+    }
+
+    public function dynamic_inputs(Candidate $candidate)
+    {
+        return redirect()->route('admin.candidate.dynamic_inputs');
+    }
+
+    /**
+     * @deprecated Use admin.candidate.dynamic_inputs — kept for old bookmarks/links.
+     */
     public function dynamic_input($id)
     {
-        $candidate = Candidate::with('attributes')->where('id', $id)->first();
-        return view('backend.candidate.dynamic-inputs', compact('candidate'));
+        return redirect()->route('admin.candidate.dynamic_inputs', $id);
     }
-    public function viewResume(Request $request)
-    {
-        try {
+    public function viewResume(Request $request, CandidateResumeViewService $resumeViewService)
+{
+    try {
 
+        /*
+        |--------------------------------------------------------------------------
+        | CANDIDATE
+        |--------------------------------------------------------------------------
+        */
 
-            $candidate = Candidate::with(['user', 'socialInfo', 'attributes' => function ($query) {
-                $query->whereNotNull('attribute_value') // Select attributes with non-null values
-                    ->where('is_active', 1); // Select only active attributes
-            }])
-                ->where('id', $request->candidate_id)
-                ->first();
+        $candidate = Candidate::query()
+            ->where('id', $request->candidate_id)
+            ->firstOrFail();
 
-            $candidate->update(['resume_format' => $request->format]);
-            $contactInfo = ContactInfo::where('user_id', $candidate->user_id)->first();
-            $contact = $contactInfo ? $contactInfo : '';
+        /*
+        |--------------------------------------------------------------------------
+        | DOWNLOAD LIMIT CHECK
+        |--------------------------------------------------------------------------
+        */
 
-            $socials = $candidate->user->socialInfo;
-            $candidate_id = $candidate->id;
-            $resumes = $candidate->resumes;
-            $job_roles = JobRole::all()->sortBy('name');
-            $experiences = Experience::all();
-            $educations = Education::all();
-            $attachments = Attachment::where('candidate_id', $candidate->id)->first();
-            $professions = Profession::all()->sortBy('name');
-            $skills = Skill::all()->sortBy('name');
-            $languages = CandidateLanguage::all(['id', 'name']);
-            $candidate->load('skills', 'languages', 'experiences', 'educations', 'jobRoleAlerts:id,candidate_id,job_role_id');
-            $translate = new GoogleTranslate($candidate->language_code);
-            $candidate->load('skills', 'languages', 'experiences', 'educations', 'expected_country', 'jobRoleAlerts:id,candidate_id,job_role_id');
-            $viewMap = [
-                'general_format' => 'frontend.pages.candidate.general-resume',
-                'driver_format' => 'frontend.pages.candidate.driver-resume',
-                'guard_format' => 'frontend.pages.candidate.security-guard-resume',
-                'beautician_format' => 'frontend.pages.candidate.beautician-resume',
-                'web_developer_format' => 'frontend.pages.candidate.web-developer-resume',
-                'bike_rider_format' => 'frontend.pages.candidate.bike-rider-resume',
-                'bilangual_format' => 'frontend.pages.candidate.bilangual-resume',
-            ];
+        if (
+            $request->action_type == 'download'
+            &&
+            !auth()->user()->canUseFeature(
+                'multilingual_cv_downloads'
+            )
+        ) {
 
-            $view = $viewMap[$request->format] ?? $viewMap['general_format'];
-            $qrCode = base64_encode(QrCode::format('png')->size(80)->generate('https://example.com/candidate/'.$candidate->id));
-            // $qrCode = QrCode::size(70)->generate('https://example.com/candidate/' . $candidate->id);
+            flashError(
+                'Your CV download limit has been exceeded'
+            );
 
-            $data = [
-                'candidate' => $candidate,
-                'contact' => $contact,
-                'socials' => $socials,
-                'job_roles' => $job_roles,
-                'experiences' => $experiences,
-                'educations' => $educations,
-                'professions' => $professions,
-                'resumes' => $resumes,
-                'skills' => $skills,
-                'candidate_languages' => $languages,
-                'attachments' => $attachments,
-                'qrCode' => $qrCode,
-                'translate' => $translate
-            ];
-            // Check action type
-            // if ($request->format == 'bilangual_format') {
-            if ($request->format == 'bilangual_format' ) {
-                $htmlContent = view($view, $data)->render();
-
-                $mpdf = new Mpdf();
-
-                $mpdf->WriteHTML($htmlContent);
-
-                if ($request->action_type == 'download') {
-                    return $mpdf->Output('candidate_cv_' . $candidate->id . '.pdf', 'D');
-                } else {
-                    return $mpdf->Output('resume.pdf', 'I');
-                    // return view($view, $data);
-
-                }
-            } else {
-                if ($request->action_type == 'download') {
-                    // Generate PDF for download
-                    $pdf = PDF::loadView($view, $data);
-                    return $pdf->download('candidate_cv_' . $candidate->id . '.pdf');
-                    // return view($view, $data);
-
-                } else {
-                    // Render resume view (for viewing in browser)
-                    // return view($view, $data);
-                    $pdf = PDF::loadView($view, $data);
-                    return $pdf->stream('resume.pdf');
-                }
-            }
-        } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
             return back();
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE RESUME FORMAT
+        |--------------------------------------------------------------------------
+        */
+
+        $candidate->update([
+
+            'resume_format' => $request->format
+        ]);
+
+        $resumeViewService->loadCandidateForResume($candidate);
+        $view = $resumeViewService->resolveView($request->format);
+        $data = $resumeViewService->buildViewData($candidate, $request);
+
+        /*
+        |--------------------------------------------------------------------------
+        | BILANGUAL PDF
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->format == 'bilangual_format'
+        ) {
+
+            if (
+                $request->action_type == 'download'
+            ) {
+
+                $htmlContent = view(
+                    $view,
+                    $data
+                )->render();
+
+                $mpdf = new Mpdf([
+                    'mode' => 'utf-8',
+                    'format' => 'A4',
+                    'default_font' => 'dejavusans',
+                ]);
+
+                $mpdf->autoScriptToLang = true;
+                $mpdf->autoLangToFont = true;
+                mpdf_write_html_chunked($mpdf, $htmlContent);
+
+                auth()->user()->increaseFeatureUsage(
+                    'multilingual_cv_downloads'
+                );
+
+                return $mpdf->Output(
+                    'candidate_cv_' .
+                    $candidate->id .
+                    '.pdf',
+                    'D'
+                );
+            }
+
+            return view($view, $data);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | NORMAL PDF
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->action_type == 'download'
+        ) {
+
+            auth()->user()->increaseFeatureUsage(
+                'multilingual_cv_downloads'
+            );
+
+            $pdf = download_resume_pdf(
+                $view,
+                $data,
+                'candidate_cv_'.$candidate->id.'.pdf'
+            );
+
+            return $pdf;
+        }
+
+        return view($view, $data);
+
+    } catch (\Exception $e) {
+
+        flashError(
+            'An error occurred: '
+            . $e->getMessage()
+        );
+
+        return back();
     }
-    public function view_cv(Request $request, $id)
-    {
-        try {
+}
+    public function view_cv(Request $request, $id, CandidateResumeViewService $resumeViewService)
+{
+    try {
 
+        $candidate = Candidate::query()
+            ->where('id', $id)
+            ->firstOrFail();
 
-            $candidate = Candidate::with(['user', 'socialInfo', 'attributes' => function ($query) {
-                $query->whereNotNull('attribute_value') // Select attributes with non-null values
-                    ->where('is_active', 1); // Select only active attributes
-            }])
-                ->where('id', $id)
-                ->first();
+        if (
+            $request->action_type == 'download'
+            &&
+            !auth()->user()->canUseFeature(
+                'multilingual_cv_downloads'
+            )
+        ) {
 
-            // $candidate->update(['resume_format' => $request->format]);
-            $contactInfo = ContactInfo::where('user_id', $candidate->user_id)->first();
-            $contact = $contactInfo ? $contactInfo : '';
+            flashError(
+                'Your CV download limit exceeded'
+            );
 
-            $socials = $candidate->socialInfo;
-            $candidate_id = $candidate->id;
-            $resumes = $candidate->resumes;
-            $job_roles = JobRole::all()->sortBy('name');
-            $experiences = Experience::all();
-            $educations = Education::all();
-            $attachments = Attachment::where('candidate_id', $candidate->id)->first();
-            $professions = Profession::all()->sortBy('name');
-            $skills = Skill::all()->sortBy('name');
-            $languages = CandidateLanguage::all(['id', 'name']);
-            $candidate->load('skills', 'languages', 'experiences', 'educations', 'jobRoleAlerts:id,candidate_id,job_role_id');
-            $translate = new GoogleTranslate($candidate->language_code);
-            $candidate->load('skills', 'languages', 'experiences', 'educations', 'expected_country', 'jobRoleAlerts:id,candidate_id,job_role_id');
-            $viewMap = [
-                'general_format' => 'frontend.pages.candidate.general-resume',
-                'driver_format' => 'frontend.pages.candidate.driver-resume',
-                'guard_format' => 'frontend.pages.candidate.security-guard-resume',
-                'beautician_format' => 'frontend.pages.candidate.beautician-resume',
-                'web_developer_format' => 'frontend.pages.candidate.web-developer-resume',
-                'bike_rider_format' => 'frontend.pages.candidate.bike-rider-resume',
-                'bilangual_format' => 'frontend.pages.candidate.bilangual-resume',
-            ];
+            return back();
+        }
 
-            $view = $viewMap[$request->format] ?? $viewMap['bilangual_format'];
-            // dd($view);
-            // $qrCode = base64_encode(QrCode::format('png')->size(70)->generate('https://example.com/candidate/'.$candidate->id));
-            $qrCode = QrCode::size(70)->generate('https://example.com/candidate/' . $candidate->id);
+        $resumeViewService->loadCandidateForResume($candidate);
+        $view = $resumeViewService->resolveView($request->format ?: 'bilangual_format');
+        $data = $resumeViewService->buildViewData($candidate, $request);
 
-            $data = [
-                'candidate' => $candidate,
-                'contact' => $contact,
-                'socials' => $socials,
-                'job_roles' => $job_roles,
-                'experiences' => $experiences,
-                'educations' => $educations,
-                'professions' => $professions,
-                'resumes' => $resumes,
-                'skills' => $skills,
-                'candidate_languages' => $languages,
-                'attachments' => $attachments,
-                'qrCode' => $qrCode,
-                'translate' => $translate
-            ];
-            // Check action type
-            // if ($request->format == 'bilangual_format') {
+        if ($request->action_type == 'download') {
             $htmlContent = view($view, $data)->render();
 
-            $mpdf = new Mpdf();
+            $mpdf = new Mpdf([
+                'mode' => 'utf-8',
+                'format' => 'A4',
+                'default_font' => 'dejavusans',
+            ]);
 
-            $mpdf->WriteHTML($htmlContent);
+            $mpdf->autoScriptToLang = true;
+            $mpdf->autoLangToFont = true;
+            mpdf_write_html_chunked($mpdf, $htmlContent);
 
-            if ($request->action_type == 'download') {
-                return $mpdf->Output('candidate_cv_' . $candidate->id . '.pdf', 'D');
-            } else {
-                return $mpdf->Output('resume.pdf', 'I');
-                // return view($view, $data);
+            auth()->user()->increaseFeatureUsage(
+                'multilingual_cv_downloads'
+            );
 
-            }
-            // } else {
-            //     if ($request->action_type == 'download') {
-            //         // Generate PDF for download
-            //         $pdf = PDF::loadView($view, $data);
-            //         return $pdf->download('candidate_cv_' . $candidate->id . '.pdf');
-            //         // return view($view, $data);
-
-            //     } else {
-            //         // Render resume view (for viewing in browser)
-            //         // return view($view, $data);
-            //         $pdf = PDF::loadView($view, $data);
-            //         return $pdf->stream('resume.pdf');
-            //     }
-            // }
-        } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
-            return back();
+            return $mpdf->Output(
+                'candidate_cv_'.$candidate->id.'.pdf',
+                'D'
+            );
         }
+
+        return view($view, $data);
+
+    } catch (\Exception $e) {
+
+        flashError(
+            'An error occurred: '
+            . $e->getMessage()
+        );
+
+        return back();
     }
+}
     public function whatsappCandidate()
     {
         $candidates = Candidate::with('user')->get();
@@ -420,54 +451,191 @@ class CandidateController extends Controller
 
         return view('backend.candidate.whatsapp-candidate', compact('candidates', 'titles'));
     }
-    public function index(Request $request)
-    {
-        try {
-            abort_if(! userCan('candidate.view'), 403);
+  public function index(Request $request)
+{
+    try {
 
-            if (auth()->user()->hasRole('superadmin')) {
-                $query = Candidate::withCount('appliedJobs')->with('user', 'jobRole');
-            } else {
-                $adminId = auth()->user()->id;
-                $query = Candidate::withCount('appliedJobs')->with('user', 'jobRole', 'agent')->where('admin_id', $adminId);
-            }
-            // verified status
-            if ($request->has('ev_status') && $request->ev_status != null) {
-                $ev_status = null;
-                if ($request->ev_status == 'true') {
-                    $query->whereHas('user', function ($q) {
-                        $q->whereNotNull('email_verified_at');
-                    });
-                } else {
-                    $query->whereHas('user', function ($q) {
-                        $q->whereNull('email_verified_at');
-                    });
-                }
-            }
+        abort_if(! userCan('candidate.view'), 403);
 
-            if ($request->keyword && $request->keyword != null) {
-                $query->whereHas('user', function ($q) use ($request) {
-                    $q->where('name', 'LIKE', "%$request->keyword%")->orWhere('email', 'LIKE', "%$request->keyword%");
-                });
-            }
+        /*
+        |--------------------------------------------------------------------------
+        | FEATURE LIMIT CHECK
+        |--------------------------------------------------------------------------
+        */
 
-            // sortby
-            if ($request->sort_by == 'latest' || $request->sort_by == null) {
-                $query->latest();
-            } else {
-                $query->oldest();
-            }
+        if (
+            !auth()->user()->canUseFeature(
+                'candidate_search_limit'
+            )
+        ) {
 
-            $candidates = $query->paginate(10)->withQueryString();
-            // dd($candidates);
-
-            return view('backend.candidate.index', compact('candidates'));
-        } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
+            flashError(
+                'Your candidate search limit has been exceeded'
+            );
 
             return back();
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CANDIDATE QUERY
+        |--------------------------------------------------------------------------
+        */
+
+        if (auth()->user()->hasRole('superadmin')) {
+
+            $query = Candidate::withCount(
+                'appliedJobs'
+            )->with(
+                'user',
+                'jobRole'
+            );
+
+        } else {
+
+            $adminId = auth()->user()->id;
+
+            $query = Candidate::withCount(
+                'appliedJobs'
+            )->with(
+                'user',
+                'jobRole',
+                'agent'
+            )->where(
+                'admin_id',
+                $adminId
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | VERIFIED STATUS FILTER
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->has('ev_status')
+            &&
+            $request->ev_status != null
+        ) {
+
+            if ($request->ev_status == 'true') {
+
+                $query->whereHas(
+                    'user',
+                    function ($q) {
+
+                        $q->whereNotNull(
+                            'email_verified_at'
+                        );
+                    }
+                );
+
+            } else {
+
+                $query->whereHas(
+                    'user',
+                    function ($q) {
+
+                        $q->whereNull(
+                            'email_verified_at'
+                        );
+                    }
+                );
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | KEYWORD SEARCH
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->keyword
+            &&
+            $request->keyword != null
+        ) {
+
+            $query->whereHas(
+                'user',
+                function ($q) use ($request) {
+
+                    $q->where(
+                        'name',
+                        'LIKE',
+                        "%{$request->keyword}%"
+                    )
+
+                    ->orWhere(
+                        'email',
+                        'LIKE',
+                        "%{$request->keyword}%"
+                    );
+                }
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | SORTING
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->sort_by == 'latest'
+            ||
+            $request->sort_by == null
+        ) {
+
+            $query->latest();
+
+        } else {
+
+            $query->oldest();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PAGINATION
+        |--------------------------------------------------------------------------
+        */
+
+        $candidates = $query
+            ->paginate(10)
+            ->withQueryString();
+
+        /*
+        |--------------------------------------------------------------------------
+        | INCREASE FEATURE USAGE
+        |--------------------------------------------------------------------------
+        */
+
+        auth()->user()->increaseFeatureUsage(
+            'candidate_search_limit'
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | RETURN VIEW
+        |--------------------------------------------------------------------------
+        */
+
+        return view(
+            'backend.candidate.index',
+            compact('candidates')
+        );
+
+    } catch (\Exception $e) {
+
+        flashError(
+            'An error occurred: '
+            . $e->getMessage()
+        );
+
+        return back();
     }
+}
     public function sendMessages(Request $request)
     {
         $request->validate([
@@ -738,8 +906,23 @@ class CandidateController extends Controller
         try {
             abort_if(! userCan('candidate.view'), 403);
 
-            $candidate = Candidate::with('skills', 'languages:id,name', 'profession')->findOrFail($candidate);
-            $user = User::with('socialInfo', 'contactInfo')->findOrFail($candidate->user_id);
+            $candidate = Candidate::with([
+                'user.socialInfo',
+                'user.contactInfo',
+                'skills',
+                'languages',
+                'profession',
+                'experience',
+                'education',
+            ])->findOrFail($candidate);
+
+            $user = $candidate->user;
+            if (! $user) {
+                flashError('This candidate has no linked user account (orphaned profile). user_id='.var_export($candidate->getAttributes()['user_id'] ?? null, true));
+
+                return redirect()->route('candidate.index');
+            }
+
             $appliedJobs = $candidate->appliedJobs()->with('company.user', 'category', 'role')->get();
             $bookmarkJobs = $candidate->bookmarkJobs()->with('company.user', 'category', 'role')->get();
 
@@ -755,19 +938,18 @@ class CandidateController extends Controller
 
             if ($jobsRequirments) {
                 if ($jobsRequirments->jobs) {
-                    $jobIds = json_decode($jobsRequirments->jobs, true);
+                    $jobIds = cw_json_array($jobsRequirments->jobs);
                     $Jobs = Profession::whereIn('id', $jobIds)->get();
                 }
 
                 if ($jobsRequirments->industries) {
-                    $industryIds = json_decode($jobsRequirments->industries, true);
+                    $industryIds = cw_json_array($jobsRequirments->industries);
                     $Industries = IndustryType::whereIn('id', $industryIds)->get();
                 }
 
                 $country = SearchCountry::where('id', $jobsRequirments->search_country_id)->first();
                 $city = City::where('id', $jobsRequirments->city_id)->first();
                 $state = State::where('id', $jobsRequirments->state_id)->first();
-                // dd($state);
             }
 
             $candidateDocument = CandidateDocument::where('candidate_id', $candidate->id)->first();
@@ -776,9 +958,14 @@ class CandidateController extends Controller
                 'candidate', 'user', 'appliedJobs', 'bookmarkJobs',
                 'Jobs', 'Industries', 'candidateDocument', 'country', 'state', 'city'
             ));
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            flashError('Candidate or linked user not found.');
+
+            return redirect()->route('candidate.index');
         } catch (\Exception $e) {
             flashError('An error occurred: ' . $e->getMessage());
-            return back();
+
+            return redirect()->route('candidate.index');
         }
     }
 
@@ -793,7 +980,14 @@ class CandidateController extends Controller
         try {
             abort_if(! userCan('candidate.update'), 403);
 
-            $user = User::with('contactInfo')->findOrFail($candidate->user_id);
+            $candidate->loadMissing('user.contactInfo');
+            $user = $candidate->user;
+            if (! $user) {
+                flashError('This candidate has no linked user account (orphaned profile).');
+
+                return redirect()->route('candidate.index');
+            }
+
             $contactInfo = ContactInfo::where('user_id', $user->id)->first();
             $job_roles = JobRole::all()->sortBy('name');
             $professions = Profession::all()->sortBy('name');
@@ -815,7 +1009,7 @@ class CandidateController extends Controller
         } catch (\Exception $e) {
             flashError('An error occurred: ' . $e->getMessage());
 
-            return back();
+            return redirect()->route('candidate.index');
         }
     }
 
@@ -1046,19 +1240,30 @@ class CandidateController extends Controller
     public function statusChange(Request $request)
     {
         try {
-            $user = User::findOrFail($request->id);
-            $user->status = $request->status;
+            $request->validate([
+                'id' => 'required|integer',
+                'status' => 'required|in:0,1',
+            ]);
+
+            $user = User::findOrFail((int) $request->id);
+            $user->status = (int) $request->status;
             $user->save();
 
-            if ($request->status == 1) {
+            if ((int) $request->status === 1) {
                 return responseSuccess(__('candidate_activated_successfully'));
-            } else {
-                return responseSuccess(__('candidate_deactivated_successfully'));
             }
-        } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
 
-            return back();
+            return responseSuccess(__('candidate_deactivated_successfully'));
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->validator->errors()->first() ?: 'Invalid status change request.',
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 404);
         }
     }
     public function is_candidate_featured(Request $request)

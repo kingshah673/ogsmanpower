@@ -5,25 +5,96 @@
     {{ __('profile') }}
 @endsection
 @section('main')
-
-    <div class="dashboard-wrapper">
+    <div class="dashboard-wrapper seeker-settings-page">
         <div class="container">
-            <div class="row">
-                {{-- <x-website.candidate.sidebar /> --}}
-                <div class="col-lg-9">
-                    <div class="dashboard-right">
-                        <div class="dashboard-right-header rt-mb-32">
-                            {{-- <div class="left-text m-0">
-                                <h1  class="f-size-18 lh-1 m-0 fa-bold">{{ __('Profile') }}</h1>
-                            </div> --}}
-                            {{-- <span class="sidebar-open-nav">
-                                <i class="ph-list"></i>
-                            </span> --}}
-                        </div>
+            <div class="dashboard-right">
 
-                        <div class="cadidate-dashboard-tabs candidate ">
+                <x-website.candidate.seeker-page-header
+                    :title="__('Additional Information')"
+                    :subtitle="__('Complete custom profile fields for your profession.')"
+                />
 
-                            <div>
+                <div class="glass-card"><div class="glass-card-body">
+                                {{-- Dynamic Custom Fields --}}
+                                @if(isset($dynamicInputs) && $dynamicInputs->count())
+                                <div class="card tw-mb-4">
+                                    <div class="card-body">
+                                        <h3 class="f-size-18 lh-1 mb-3">{{ __('Additional Information') }}</h3>
+                                        <form id="dynamicAttributesForm">
+                                            @csrf
+                                            <div class="row">
+                                                @foreach($dynamicInputs as $attr)
+                                                <div class="col-lg-6 rt-mb-24">
+                                                    <label class="f-size-14 text-gray-700 rt-mb-8">
+                                                        {{ $attr->attribute_name }}
+                                                        @if($attr->is_required)<span class="text-danger">*</span>@endif
+                                                    </label>
+
+                                                    @if($attr->input_type === 'textarea')
+                                                        <textarea
+                                                            name="values[{{ $attr->id }}]"
+                                                            class="form-control"
+                                                            rows="3"
+                                                            {{ $attr->is_required ? 'required' : '' }}
+                                                        >{{ $attr->attribute_value }}</textarea>
+
+                                                    @elseif($attr->input_type === 'date')
+                                                        <input
+                                                            type="text"
+                                                            name="values[{{ $attr->id }}]"
+                                                            class="form-control flatpickr-date"
+                                                            value="{{ $attr->attribute_value }}"
+                                                            placeholder="YYYY-MM-DD"
+                                                            autocomplete="off"
+                                                            {{ $attr->is_required ? 'required' : '' }}
+                                                        >
+
+                                                    @elseif($attr->input_type === 'dropdown')
+                                                        @php
+                                                            $opts = json_decode($attr->options ?? '[]', true) ?? [];
+                                                        @endphp
+                                                        <select name="values[{{ $attr->id }}]" class="form-control" {{ $attr->is_required ? 'required' : '' }}>
+                                                            <option value="">-- Select --</option>
+                                                            @foreach($opts as $opt)
+                                                                <option value="{{ $opt }}" {{ $attr->attribute_value === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                                                            @endforeach
+                                                        </select>
+
+                                                    @elseif($attr->input_type === 'file')
+                                                        @if($attr->attribute_value)
+                                                            <div class="mb-1">
+                                                                <a href="{{ asset('storage/' . $attr->attribute_value) }}" target="_blank" class="text-primary small">View current file</a>
+                                                            </div>
+                                                        @endif
+                                                        <input
+                                                            type="file"
+                                                            name="values[{{ $attr->id }}]"
+                                                            class="form-control"
+                                                            {{ $attr->is_required && !$attr->attribute_value ? 'required' : '' }}
+                                                        >
+
+                                                    @else
+                                                        <input
+                                                            type="text"
+                                                            name="values[{{ $attr->id }}]"
+                                                            class="form-control"
+                                                            value="{{ $attr->attribute_value }}"
+                                                            placeholder="{{ $attr->attribute_name }}"
+                                                            {{ $attr->is_required ? 'required' : '' }}
+                                                        >
+                                                    @endif
+                                                </div>
+                                                @endforeach
+                                            </div>
+                                            <button type="button" id="saveDynamicFields" class="btn btn-primary mt-2">
+                                                {{ __('Save') }}
+                                            </button>
+                                            <span id="dynamicSaveMsg" class="ms-2 text-success small d-none">Saved!</span>
+                                        </form>
+                                    </div>
+                                </div>
+                                @endif
+
                                 {{-- Basic Setting  --}}
 
                                 {{-- Change Email --}}
@@ -214,21 +285,16 @@
 
 
                             </div>
-                        </div>
+                        </div></div>
 
-                    </div>
-                </div>
             </div>
         </div>
-        {{-- <div class="dashboard-footer text-center body-font-4 text-gray-500">
-            <x-website.footer-copyright />
-        </div> --}}
-    </div>
     </div>
 
 @endsection
 
 @section('frontend_links')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="{{ asset('frontend') }}/assets/css/bootstrap-datepicker.min.css">
     <!-- >=>Leaflet Map<=< -->
     <x-map.leaflet.map_links />
@@ -353,6 +419,48 @@
         })
     </script>
     @stack('js')
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        // Flatpickr for dynamic date fields
+        document.querySelectorAll('.flatpickr-date').forEach(function(el) {
+            flatpickr(el, { dateFormat: 'Y-m-d', allowInput: true });
+        });
+
+        // AJAX save for dynamic attribute fields
+        document.getElementById('saveDynamicFields')?.addEventListener('click', function() {
+            var form   = document.getElementById('dynamicAttributesForm');
+            var data   = new FormData(form);
+            var btn    = this;
+            var msg    = document.getElementById('dynamicSaveMsg');
+
+            btn.disabled = true;
+
+            fetch("{{ route('candidate.saveAttributeValues') }}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+                        || '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                body: data,
+            })
+            .then(r => r.json())
+            .then(function(res) {
+                btn.disabled = false;
+                if (res.success) {
+                    msg.classList.remove('d-none');
+                    setTimeout(() => msg.classList.add('d-none'), 3000);
+                } else {
+                    alert(res.message ?? 'Save failed.');
+                }
+            })
+            .catch(function() {
+                btn.disabled = false;
+                alert('Network error — please try again.');
+            });
+        });
+    </script>
     <script src="{{ asset('backend/plugins/select2/js/select2.full.min.js') }}"></script>
     <script src="{{ asset('frontend/assets/js/bootstrap-datepicker.min.js') }}"></script>
     @if (app()->getLocale() == 'ar')

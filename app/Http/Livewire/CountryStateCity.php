@@ -39,25 +39,23 @@ class CountryStateCity extends Component
             ->get()
             ->toArray();
 
-        $selectedCountry = SearchCountry::where('name', $this->selectedCountryId)->first();
+        $selectedCountry = $this->resolveSelectedCountry();
         if ($selectedCountry) {
-            $countryId = $selectedCountry->id;
             $this->states = State::select('id', 'name', 'country_id')
-                ->where('country_id', $countryId)
+                ->where('country_id', $selectedCountry->id)
+                ->orderBy('name')
                 ->get()
                 ->toArray();
         } else {
-            // Handle the case where the selected city was not found
             $this->states = [];
         }
 
-        $selectedState = State::where('name', $this->selectedStateId)->first();
+        $selectedState = $this->resolveSelectedState($selectedCountry);
 
         if ($selectedState) {
-            $stateId = $selectedState->id;
-
             $this->cities = City::select('id', 'name', 'state_id')
-                ->where('state_id', $stateId)
+                ->where('state_id', $selectedState->id)
+                ->orderBy('name')
                 ->get()
                 ->toArray();
         } else {
@@ -67,37 +65,72 @@ class CountryStateCity extends Component
         return view('livewire.country-state-city');
     }
 
-    public function getStateByCountryId()
+    public function getStateByCountryId($countryName = null)
     {
-        $selectedCity = SearchCountry::where('name', $this->selectedCountryId)->first();
+        if ($countryName) {
+            $this->selectedCountryId = $countryName;
+        }
 
-        if ($selectedCity) {
-            $countryId = $selectedCity->id;
+        $selectedCountry = $this->resolveSelectedCountry();
+
+        if ($selectedCountry) {
             $this->states = State::select('id', 'name', 'country_id')
-                ->where('country_id', $countryId)
+                ->where('country_id', $selectedCountry->id)
+                ->orderBy('name')
                 ->get()
                 ->toArray();
         } else {
-            // Handle the case where the selected city was not found
             $this->states = [];
         }
+
+        $this->selectedStateId = null;
+        $this->selectedCityId = null;
+        $this->cities = [];
     }
 
-    public function getCityByStateId()
+    public function getCityByStateId($stateName = null)
     {
-        // Assuming you have a Zone model with a 'country_id' attribute
-        $selectedState = State::where('name', $this->selectedStateId)->first();
+        if ($stateName) {
+            $this->selectedStateId = $stateName;
+        }
+
+        $selectedState = $this->resolveSelectedState($this->resolveSelectedCountry());
 
         if ($selectedState) {
-            $stateId = $selectedState->id;
-
             $this->cities = City::select('id', 'name', 'state_id', 'long', 'lat')
-                ->where('state_id', $stateId)
+                ->where('state_id', $selectedState->id)
+                ->orderBy('name')
                 ->get()
                 ->toArray();
         } else {
             $this->cities = [];
         }
+
+        $this->selectedCityId = null;
+    }
+
+    private function resolveSelectedCountry(): ?SearchCountry
+    {
+        if (empty($this->selectedCountryId)) {
+            return null;
+        }
+
+        return SearchCountry::where('name', $this->selectedCountryId)->first();
+    }
+
+    private function resolveSelectedState(?SearchCountry $selectedCountry): ?State
+    {
+        if (empty($this->selectedStateId)) {
+            return null;
+        }
+
+        $query = State::where('name', $this->selectedStateId);
+
+        if ($selectedCountry) {
+            $query->where('country_id', $selectedCountry->id);
+        }
+
+        return $query->first();
     }
 
     public function mount()
@@ -118,7 +151,10 @@ class CountryStateCity extends Component
     public function updatedselectedCountryId($value)
     {
         session(['selectedCountryId' => $value]);
-        // Update session values for 'long' and 'lat' based on the selected country
+        $this->selectedStateId = null;
+        $this->selectedCityId = null;
+        $this->cities = [];
+
         $selectedCountry = SearchCountry::where('name', $value)->first();
         if ($selectedCountry) {
             session(['selectedCountryLong' => $selectedCountry->long]);
@@ -129,8 +165,9 @@ class CountryStateCity extends Component
     public function updatedselectedStateId($value)
     {
         session(['selectedStateId' => $value]);
-        // Update session values for 'long' and 'lat' based on the selected state
-        $selectedState = State::where('name', $value)->first();
+        $this->selectedCityId = null;
+
+        $selectedState = $this->resolveSelectedState($this->resolveSelectedCountry());
         if ($selectedState) {
             session(['selectedStateLong' => $selectedState->long]);
             session(['selectedStateLat' => $selectedState->lat]);

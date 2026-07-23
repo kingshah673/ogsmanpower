@@ -12,3 +12,15 @@
 # Environment files
 .env
 .env.*
+
+# Local backup dump — do not commit
+storage_old/
+public/debug.php
+public/opcache.php
+public/error_log
+public/test.php
+
+
+# Too large for GitHub (>100MB); use cities.json.gz
+resources/seed-data/cities.json
+

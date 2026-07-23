@@ -7,6 +7,8 @@
     <meta name="description" content="">
     <title>{{ __('setup_progress') }}</title>
     <link rel="stylesheet" href="{{ asset('frontend') }}/assets/css/bootstrap-datepicker.min.css">
+    <link rel="stylesheet" href="{{ asset('backend/plugins/select2/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('backend/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
     @include('frontend.partials.styles')
     @yield('css')
 </head>
@@ -22,10 +24,8 @@
     </button> --}}
     <!-- PWA Button End -->
 
-    <!-- scripts -->
+    <!-- scripts (includes @yield('script') once at the end) -->
     @include('frontend.partials.scripts')
-    <script src="{{ asset('frontend/assets/js/bootstrap-datepicker.min.js') }}"></script>
-    @yield('script')
 
 </body>
 

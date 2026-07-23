@@ -1,0 +1,73 @@
+@props(['user', 'longForm' => false])
+
+<form action="{{ route('agency.profile.complete', auth()->user()->id) }}" method="post" enctype="multipart/form-data">
+    @method('PUT')
+    @csrf
+    <input type="hidden" name="field" value="personal">
+    @if ($errors->any())
+    <div class="alert alert-danger">
+        <ul>
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+    <fieldset>
+        <div class="form-card">
+            <div class="personal-profile-picture-wrap">
+                <div class="agency-logo-banner-info">
+                    @unless($longForm)
+                    <h6>{{ __('logo_banner_image') }}</h6>
+                    @endunless
+                    <div class="row">
+                         <x-website.agency.photo-section :user="$user" />
+                        <x-website.agency.banner-section :user="$user" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-account-setting-item">
+                @unless($longForm)
+                <h6>{{ __('agency_information') }}</h6>
+                @endunless
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <label class="pointer body-font-4 d-block text-gray-900 rt-mb-8">
+                            {{ __('agency_name') }}
+                            <x-forms.required />
+                        </label>
+                        <div class="fromGroup">
+                            <div class="form-control-icon">
+                                <input class="form-control @error('name') is-invalid @enderror" type="text"
+                                    name="name" value="{{ $user->name ?? old('name') }}">
+
+                                @error('name')
+                                    <span class="invalid-feedback" role="alert">
+                                        <strong>{{ __($message) }}</strong>
+                                    </span>
+                                @enderror
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="body-font-4 d-block text-gray-900 rt-mb-8">
+                            {{ __('biography') }}
+                            <x-forms.required />
+                        </label>
+                        <textarea rows="8" class="form-control @error('bio') is-invalid @enderror" name="bio"
+                            placeholder="{{ __('biography') }}" id="image_ckeditor">{{ $user->agency->bio ?? old('bio') }}</textarea>
+                        @error('bio')
+                            <span class="invalid-feedback" role="alert">
+                                <strong>{{ __($message) }}</strong>
+                            </span>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button type="submit" class="btn next btn-primary">
+            {{ $longForm ? __('save') : __('save_next') }}
+        </button>
+    </fieldset>
+</form>

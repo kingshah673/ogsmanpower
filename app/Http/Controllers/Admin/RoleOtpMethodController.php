@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\Role;
+use App\Models\Setting;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Http\Request;
 
@@ -28,12 +29,39 @@ class RoleOtpMethodController extends Controller
     {
         try {
             abort_if(! userCan('role.view'), 403);
-            
+
             $roles = Role::get();
 
             return view('backend.roleOtpMethods.index', [
                 'roles' => $roles,
             ]);
+        } catch (\Exception $e) {
+            flashError('An error occurred: '.$e->getMessage());
+
+            return back();
+        }
+    }
+
+    /**
+     * Save per-role OTP toggle settings (Seeker & Employer).
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function saveOtpSettings(Request $request)
+    {
+        abort_if(! userCan('role.edit'), 403);
+
+        try {
+            Setting::first()->update([
+                'candidate_email_otp'    => $request->has('candidate_email_otp')    ? 1 : 0,
+                'candidate_whatsapp_otp' => $request->has('candidate_whatsapp_otp') ? 1 : 0,
+                'employer_email_otp'     => $request->has('employer_email_otp')     ? 1 : 0,
+                'employer_whatsapp_otp'  => $request->has('employer_whatsapp_otp')  ? 1 : 0,
+            ]);
+
+            flashSuccess('OTP settings updated successfully');
+
+            return redirect()->route('roles.otp-methods.index');
         } catch (\Exception $e) {
             flashError('An error occurred: '.$e->getMessage());
 

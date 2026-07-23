@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CompanyJobTrait;
-use App\Http\Traits\Jobable;
+use App\Http\Traits\JobAble;
 use App\Models\ApplicationGroup;
 use App\Models\CompanyBookmarkCategory;
 use App\Models\Earning;
@@ -32,7 +32,7 @@ use PDF;
 
 class CompanyController extends Controller
 {
-    use ApiResponseHelpers, CompanyJobTrait, Jobable;
+    use ApiResponseHelpers, CompanyJobTrait, JobAble;
 
     public function dashboard()
     {
@@ -42,7 +42,7 @@ class CompanyController extends Controller
         // Recent 4 Jobs
         $data['recentJobs'] = auth('sanctum')->user()->company->jobs()
             ->select(['id', 'title', 'company_id', 'country', 'max_salary', 'min_salary', 'job_type_id', 'slug', 'deadline', 'status'])
-            ->latest()->with('company:id', 'job_type:id,name')->withCount('appliedJobs')->take(4)->get();
+            ->latest()->with('company:id', 'job_type')->withCount('appliedJobs')->take(4)->get();
         $data['savedCandidateCount'] = auth('sanctum')->user()->company->bookmarkCandidates()->count();
 
         return $this->respondWithSuccess([

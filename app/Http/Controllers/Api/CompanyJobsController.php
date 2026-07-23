@@ -20,7 +20,7 @@ class CompanyJobsController extends Controller
         $jobs = Job::where('company_id', auth('sanctum')->user()->company->id)
             ->select(['id', 'title', 'company_id', 'country', 'max_salary', 'min_salary', 'job_type_id', 'slug', 'deadline', 'status'])
         // ->whereDate('deadline', '>', Carbon::now()->toDateString())
-            ->with('company:id', 'job_type:id,name')->withCount('appliedJobs')
+            ->with('company:id', 'job_type')->withCount('appliedJobs')
         // ->where('status', request('status'))
             ->when($status = request('status'), function ($query) use ($status) {
                 $query->where('status', $status);

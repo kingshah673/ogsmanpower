@@ -14,27 +14,26 @@
     <meta property="og:image" content="@yield('og:image')">
     <script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
         crossorigin="anonymous"></script>
-    {{-- <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" /> --}}
-    <title>@yield('title') - {{ config('app.name') }}</title>
 
     @yield('ld-data')
 
     {{-- Style --}}
     @include('frontend.partials.styles')
-    {{-- @include('frontend.partials.preloader') --}}
+    <link rel="stylesheet" href="{{ asset('css/candidate-seeker-common.css') }}?v={{ @filemtime(public_path('css/candidate-seeker-common.css')) ?: '1' }}">
+    <link rel="stylesheet" href="{{ asset('css/candidate-settings-classic.css') }}?v={{ @filemtime(public_path('css/candidate-settings-classic.css')) ?: '1' }}">
     @yield('css')
 
     {{-- Custome css and js  --}}
     {!! $setting->header_css !!}
     {!! $setting->header_script !!}
     @include('backend.layouts.partials.styles')
-    <script src="{{ asset('backend/plugins/jquery/jquery.min.js') }}"></script>
     <script src="{{ asset('backend/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ asset('backend/plugins/toastr/toastr.min.js') }}"></script>
-    <script src="{{ asset('backend/js/ckeditor.js') }}"></script>
     <script src="{{ asset('backend/js/livewire.js') }}"></script>
     <script src="{{ asset('backend/js/adminlte.min.js') }}"></script>
+    @unless (request()->routeIs('candidate.*', 'company.*', 'agency.*', 'agent.*'))
     <script src='https://www.google.com/recaptcha/api.js'></script>
+    @endunless
     <script src="{{ asset('frontend') }}/assets/js/axios.min.js"></script>
     <script src="{{ asset('backend/plugins/select2/js/select2.full.min.js') }}"></script>
     <script src="{{ asset('frontend/assets/js/bootstrap-datepicker.min.js') }}"></script>
@@ -43,52 +42,70 @@
 </head>
 
 <style>
-    .title {
-        color: white;
+    .main-header.navbar {
         display: flex;
         align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 1.5rem;
-        width: auto;
-        /* Ensure it takes full width to center */
-        position: absolute;
-        /* Remove it from the normal document flow */
-        left: 45%;
-        /* Align to the middle horizontally */
-        transform: translateX(-50%);
-        /* Adjust for center alignment */
-        z-index: -2;
-        /* Make sure it stays on top */
-        margin: initial
+        min-height: 56px;
+        padding: 0 0.75rem 0 0.5rem;
+        background: #0A65CC !important;
+        border-bottom: none;
+        box-shadow: 0 1px 0 rgba(15, 23, 42, 0.08);
     }
-
-    /* Media query to hide the title on screens smaller than 1024px width or 309px height */
-    @media (max-width: 1024px),
-    (max-height: 309px) {
-        .title {
-            color: white;
-            display: flex;
-            align-items: center;
-            /* justify-content: center; */
-            font-weight: bold;
-            font-size: 1rem;
-            width:auto;
-            /* Ensure it takes full width to center */
-            position: absolute;
-            /* Remove it from the normal document flow */
-            left: 39%;
-            /* Align to the middle horizontally */
-            transform: translateX(-50%);
-            z-index: 1;
-            /* Make sure it stays on top */
-            margin: initial
+    .main-header .navbar-nav {
+        flex-direction: row;
+        align-items: center;
+        margin: 0;
+    }
+    .main-header .cw-portal-title {
+        flex: 1;
+        text-align: center;
+        color: #fff;
+        font-weight: 600;
+        font-size: 1rem;
+        letter-spacing: 0.02em;
+        margin: 0 0.75rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        pointer-events: none;
+    }
+    .main-header .cw-nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    .main-header .cw-nav-actions > li {
+        display: flex;
+        align-items: center;
+        margin: 0;
+    }
+    .main-header .cw-nav-actions .nav-link {
+        color: #fff !important;
+        padding: 0.4rem 0.55rem;
+        line-height: 1;
+        border-radius: 8px;
+    }
+    .main-header .cw-nav-actions .nav-link:hover {
+        background: rgba(255, 255, 255, 0.12);
+    }
+    .main-header .candidate-profile img {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+    }
+    @media (max-width: 767px) {
+        .main-header .cw-portal-title {
+            font-size: 0.85rem;
+            margin: 0 0.35rem;
         }
     }
-
-    @media (max-width: 426px),
-    (max-height: 309px) {
-        .title {
+    @media (max-width: 480px) {
+        .main-header .cw-portal-title {
             display: none;
         }
     }
@@ -105,25 +122,23 @@
     <div class="wrapper">
         <!-- Navbar -->
         <nav id="nav"
-            class="main-header navbar navbar-expand {{ $setting->dark_mode ? 'navbar-dark navbar-dark' : 'navbar-white navbar-light' }}">
+            class="main-header navbar navbar-expand navbar-dark">
 
             <!-- Left navbar links -->
             <ul class="navbar-nav">
-                <li class="nav-item ">
-                    <a id="nav_collapse" class="nav-link" data-widget="pushmenu" href="#" role="button"
-                        style="color: white"><i class="fas fa-bars"></i></a>
+                <li class="nav-item">
+                    <a id="nav_collapse" class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
                 </li>
             </ul>
 
-            <!-- Centered title -->
-            <span class="title "> OGS MANPOWER Seeker Portal</span>
+            <span class="cw-portal-title">OGS MANPOWER Seeker Portal</span>
             <ul class="navbar-nav ml-auto">
                 @auth('user')
-                    <ul class="list-unstyled tw-gap-6 d-flex ">
-                        <li style="margin-top:5px;">
-                            <a title="{{ __('browse_website') }}" target="_blank" class="nav-link" style="color: white;"
+                    <ul class="cw-nav-actions">
+                        <li>
+                            <a title="{{ __('browse_website') }}" target="_blank" class="nav-link"
                                 href="{{ url('/') }}">
-                                <i class="fas fa-globe fa-2"></i>
+                                <i class="fas fa-globe"></i>
                             </a>
                         </li>
 
@@ -131,7 +146,7 @@
                             <x-website.candidate.notifications-component />
                         @endif
 
-                        <div class="dropdown dropstart">
+                        <li class="dropdown dropstart">
                             <a href="javascript:void(0)" class="candidate-profile position-relative"
                                 id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                                 @company
@@ -158,6 +173,13 @@
                                         href="{{ route('candidate.dashboard') }}">
                                         <i class="ph-stack"></i>
                                         {{ __('dashboard') }}
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item {{ request()->routeIs('candidate.profile.view') ? 'active' : '' }}"
+                                        href="{{ route('candidate.profile.view') }}">
+                                        <i class="ph-user-circle"></i>
+                                        {{ __('View Profile') }}
                                     </a>
                                 </li>
                                 <li>
@@ -224,7 +246,7 @@
                                 </li>
                             </ul>
                             @endcandidate
-                        </div>
+                        </li>
                         @if (!request()->is('email/verify'))
                             @company
                                 <li class="tw-hidden sm:tw-block">
@@ -267,16 +289,15 @@
                 <div class="container-fluid">
                     @yield('main')
                     <!-- /.row -->
-                    @include('frontend.partials.scripts')
+                    @include('frontend.partials.scripts', ['dashboard_layout' => true])
 
                     <!-- Custom js -->
                     {!! $setting->body_script !!}
                     <x-frontend.cookies-allowance :cookies="$cookies" />
 
                     <script>
-                        // Hide the preloader when loaded
                         var el = document.querySelector(".preloader");
-                        el && window.addEventListener("load", () => el.style.display = "none");
+                        el && window.addEventListener("load", function () { el.style.display = "none"; });
                     </script>
                 </div>
                 <!-- /.container-fluid -->
@@ -301,7 +322,10 @@
     </script>
     <script>
         window.onload = function() {
-            document.querySelector('.preloader').style.display = 'none';
+            var preloader = document.querySelector('.preloader');
+            if (preloader) {
+                preloader.style.display = 'none';
+            }
         };
     </script>
     @if ($setting->pwa_enable)
@@ -336,6 +360,10 @@
             });
         </script>
     @endif
+
+    @include('frontend.partials.sophia-widget')
+
+    @yield('script')
 
 </body>
 

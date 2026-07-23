@@ -1,0 +1,22 @@
+[
+    {"id": 2000001, "name": "Lahore", "state_id": 3176, "long": "74.3587", "lat": "31.5204"},
+    {"id": 2000002, "name": "Faisalabad", "state_id": 3176, "long": "73.0845", "lat": "31.4180"},
+    {"id": 2000003, "name": "Rawalpindi", "state_id": 3176, "long": "73.0479", "lat": "33.5651"},
+    {"id": 2000004, "name": "Multan", "state_id": 3176, "long": "71.5249", "lat": "30.1575"},
+    {"id": 2000005, "name": "Gujranwala", "state_id": 3176, "long": "74.1871", "lat": "32.1877"},
+    {"id": 2000006, "name": "Sialkot", "state_id": 3176, "long": "74.5403", "lat": "32.4945"},
+    {"id": 2000007, "name": "Karachi", "state_id": 3175, "long": "67.0011", "lat": "24.8607"},
+    {"id": 2000008, "name": "Hyderabad", "state_id": 3175, "long": "68.3578", "lat": "25.3960"},
+    {"id": 2000009, "name": "Sukkur", "state_id": 3175, "long": "68.8488", "lat": "27.7052"},
+    {"id": 2000010, "name": "Larkana", "state_id": 3175, "long": "68.2141", "lat": "27.5600"},
+    {"id": 2000011, "name": "Peshawar", "state_id": 3171, "long": "71.5249", "lat": "34.0151"},
+    {"id": 2000012, "name": "Mardan", "state_id": 3171, "long": "72.0447", "lat": "34.1988"},
+    {"id": 2000013, "name": "Abbottabad", "state_id": 3171, "long": "73.2215", "lat": "34.1688"},
+    {"id": 2000014, "name": "Quetta", "state_id": 3174, "long": "67.0011", "lat": "30.1798"},
+    {"id": 2000015, "name": "Gwadar", "state_id": 3174, "long": "62.3254", "lat": "25.1264"},
+    {"id": 2000016, "name": "Islamabad", "state_id": 3169, "long": "73.0479", "lat": "33.6844"},
+    {"id": 2000017, "name": "Gilgit", "state_id": 3170, "long": "74.3132", "lat": "35.9208"},
+    {"id": 2000018, "name": "Skardu", "state_id": 3170, "long": "75.6345", "lat": "35.2971"},
+    {"id": 2000019, "name": "Muzaffarabad", "state_id": 3172, "long": "73.4711", "lat": "34.3700"},
+    {"id": 2000020, "name": "Mirpur", "state_id": 3172, "long": "73.7519", "lat": "33.1478"}
+]

@@ -72,7 +72,7 @@ class ApplyJobNotification extends Notification
             'title' => ucfirst($this->user->name).' has applied your job',
             'url' => route('company.myjob'),
             'title2' => 'You have applied the job of '.$this->company->name,
-            'url2' => route('company.myjob'),
+            'url2' => route('candidate.appliedjob'),
         ];
     }
 }

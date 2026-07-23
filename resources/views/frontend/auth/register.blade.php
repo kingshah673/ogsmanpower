@@ -1,69 +1,129 @@
 @extends('frontend.auth.layouts.auth')
 
-@section('meta')
-    @php
-        $data = metaData('register');
-    @endphp
-@endsection
-
-@section('description')
-    {{ $data->description }}
-@endsection
-
-@section('title')
-    {{ __('register') }}
-@endsection
-
-@section('og:image')
-    {{ asset($data->image) }}
-@endsection
-
 @section('content')
-<!----start---->
-<div class="login-page d-flex flex-column flex-lg-row min-vh-100">
+<div class="login-page min-vh-100 d-flex align-items-center">
 
-    {{-- Left Panel: Login Form --}}
-     <div class="full-height col-12 order-1 order-lg-0">
-        <div class="container">
-            <div class="row full-height align-items-center">
-                <div class="col-xl-5 col-lg-6 col-md-12">
-                    <div class="auth-box2 glass-card">
+    <div class="container">
+        <div class="row align-items-center">
+
+            <!-- LEFT SIDE (PROMOTION) -->
+            <div class="col-lg-6 d-none d-lg-flex">
+                <div class="promo-box w-100">
+
+                    @php
+                        $registrationType = old('type', request()->query('type', ''));
+                        $registrationMeta = registrationTypeMeta($registrationType);
+                    @endphp
+
+                    <h1>{{ $registrationMeta['headline'] ?: 'Build Your Global Career' }}</h1>
+
+                    <p>{{ $registrationMeta['description'] ?: 'Join thousands of professionals connecting with top employers worldwide. Your journey starts here.' }}</p>
+
+                    @if (in_array($registrationMeta['type'], ['seeker', 'domestic_worker', 'abroad_student', 'work_permit_seeker'], true) || $registrationMeta['type'] === '')
+                    <ul class="promo-list">
+                        <li>✔ Premium Job Opportunities</li>
+                        <li>✔ International Hiring Network</li>
+                        <li>✔ Trusted by Employers</li>
+                    </ul>
+                    @elseif (in_array($registrationMeta['type'], ['employer', 'labour_supply', 'university'], true))
+                    <ul class="promo-list">
+                        <li>✔ Post jobs nationally & internationally</li>
+                        <li>✔ Access verified candidates</li>
+                        <li>✔ Manage hiring in one dashboard</li>
+                    </ul>
+                    @elseif (in_array($registrationMeta['type'], ['agency', 'domestic_office', 'eu_permit_specialist'], true))
+                    <ul class="promo-list">
+                        <li>✔ Manage clients & placements</li>
+                        <li>✔ Build your agent network</li>
+                        <li>✔ Scale recruitment operations</li>
+                    </ul>
+                    @elseif (in_array($registrationMeta['type'], ['agent', 'hr_referral'], true))
+                    <ul class="promo-list">
+                        <li>✔ Manage candidate portfolios</li>
+                        <li>✔ Apply to jobs on their behalf</li>
+                        <li>✔ Track application status</li>
+                    </ul>
+                    @elseif ($registrationMeta['type'] === 'broker')
+                    <ul class="promo-list">
+                        <li>✔ Create demand / job orders</li>
+                        <li>✔ Route demand to Recruitment Agencies</li>
+                        <li>✔ Track open and routed requests</li>
+                    </ul>
+                    @endif
+
+                </div>
+            </div>
+
+            <!-- RIGHT SIDE (FORM) -->
+            <div class="col-lg-6 col-md-12">
+                <div class="form-wrapper">
+
+                    <div class="auth-box2">
+
+                        <!-- ===== YOUR ORIGINAL FORM START (UNCHANGED) ===== -->
                         <form id="dynamicForm" action="{{ route('register') }}" method="POST">
                             @csrf
+
+                            @php
+                                $registrationType = old('type', request()->query('type', ''));
+                                $registrationMeta = registrationTypeMeta($registrationType);
+                                $registrationRole = old('role', $registrationMeta['role']);
+                            @endphp
+
+                            <input type="hidden" name="type" id="registrationType" value="{{ $registrationMeta['type'] }}">
+                            <input type="hidden" name="role" id="registrationRole" value="{{ $registrationRole }}">
+
                             <h4 class="rt-mb-20">{{ __('create_account') }}</h4>
-                            
+
+                            @if ($errors->any())
+                                <div class="alert alert-danger rt-mb-15" style="border-radius:8px; font-size:14px;">
+                                    <ul class="mb-0 ps-3">
+                                        @foreach ($errors->all() as $error)
+                                            <li>{{ $error }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                            @error('type')
+                                <div class="alert alert-warning rt-mb-15">{{ $message }}</div>
+                            @enderror
+
                             <span class="d-block body-font-3 text-gray-600 rt-mb-32">
                                 {{ __('already_have_account') }}
-                                <span>
-                                    <a href="{{ route('login') }}">{{ __('log_in') }}</a>
-                                </span>
+                                <a href="{{ route('login') }}">{{ __('log_in') }}</a>
                             </span>
 
-                            <!-- Role Selection -->
+                            <!-- Role banner -->
                             <div class="tw-bg-[#F1F2F4] tw-rounded-lg tw-mb-6 tw-p-3 text-center">
-                                <p class="tw-text-[#767F8C] tw-text-xs tw-font-medium tw-text-center tw-mb-2">
-                                    @php
-$type = request()->get('type');
-@endphp
-
-<p class="text-center fw-bold">
-    You are registering as 
-    <span class="text-primary"><x-svg.candidate-profile-icon />
-        {{ $type == 'seeker' ? 'Seeker' : ($type == 'employer' ? 'Employer/Kafeel' : 'User') }}
-    </span>
-</p>
-                                </p>
-                                <div class="flex justify-center gap-4">
-                                    <label class="flex items-center gap-1">
-                                        <input  name="role" type="radio" value="candidate"{{ request('type') == 'seeker' ? 'checked' : '' }}>
-                                        <x-svg.candidate-profile-icon /> {{ __('candidate') }}
-                                    </label>
-                                    <label class="flex items-center gap-1">
-                                        <input  name="role" type="radio" value="company"{{ request('type') == 'employer' ? 'checked' : '' }}>
-                                        <x-svg.employer-profile-icon /> {{ __('Employer/Kafeel') }}
-                                    </label>
-                                    
-                                </div>
+                                @if ($registrationMeta['label'])
+                                    <p class="fw-bold mb-1">
+                                        {{ __('you_are_registering_as') }}
+                                        <span class="role-blink">{{ $registrationMeta['label'] }}</span>
+                                    </p>
+                                    <a href="javascript:void(0)"
+                                       class="small text-muted"
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#registerTypeModal">
+                                        {{ __('change_role') }}
+                                    </a>
+                                @else
+                                    <p class="fw-bold mb-2">{{ __('choose_how_to_register') }}</p>
+                                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                                        <a href="{{ route('register', ['type' => 'seeker']) }}" class="btn btn-sm btn-outline-primary">{{ __('seeker') }}</a>
+                                        <a href="{{ route('register', ['type' => 'employer']) }}" class="btn btn-sm btn-outline-primary">{{ __('employer') }}</a>
+                                        <a href="{{ route('register', ['type' => 'agency']) }}" class="btn btn-sm btn-outline-primary">{{ __('recruitment_agency') }}</a>
+                                        <a href="{{ route('register', ['type' => 'agent']) }}" class="btn btn-sm btn-outline-primary">Agent / Facilitator</a>
+                                        <a href="{{ route('register', ['type' => 'broker']) }}" class="btn btn-sm btn-outline-primary">Broker / Middleman</a>
+                                        <a href="{{ route('register', ['type' => 'labour_supply']) }}" class="btn btn-sm btn-outline-primary">Labour Supply Office</a>
+                                        <a href="{{ route('register', ['type' => 'hr_referral']) }}" class="btn btn-sm btn-outline-primary">HR Referral Partner</a>
+                                        <a href="{{ route('register', ['type' => 'domestic_office']) }}" class="btn btn-sm btn-outline-primary">Domestic Worker Office</a>
+                                        <a href="{{ route('register', ['type' => 'domestic_worker']) }}" class="btn btn-sm btn-outline-primary">Selected Domestic Worker</a>
+                                        <a href="{{ route('register', ['type' => 'university']) }}" class="btn btn-sm btn-outline-primary">University / College / School</a>
+                                        <a href="{{ route('register', ['type' => 'abroad_student']) }}" class="btn btn-sm btn-outline-primary">Abroad Edu Student</a>
+                                        <a href="{{ route('register', ['type' => 'eu_permit_specialist']) }}" class="btn btn-sm btn-outline-primary">EU Work Permit Specialist</a>
+                                        <a href="{{ route('register', ['type' => 'work_permit_seeker']) }}" class="btn btn-sm btn-outline-primary">Work Permit Seeker</a>
+                                    </div>
+                                @endif
                             </div>
 
                             <!-- Name -->
@@ -71,7 +131,7 @@ $type = request()->get('type');
                                 <input type="text" name="name" id="name" value="{{ old('name') }}"
                                     class="form-control @error('name') is-invalid @enderror"
                                     placeholder="{{ __('full_name') }}">
-                                @error('name') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                                @error('name')<small class="text-danger">{{ $message }}</small>@enderror
                             </div>
 
                             <!-- Email -->
@@ -79,19 +139,22 @@ $type = request()->get('type');
                                 <input type="email" name="email" id="email" value="{{ old('email') }}"
                                     class="form-control @error('email') is-invalid @enderror"
                                     placeholder="{{ __('email_address') }}">
-                                @error('email') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                                @error('email')<small class="text-danger">{{ $message }}</small>@enderror
                             </div>
 
                             <!-- WhatsApp -->
-                            <div class="fromGroup rt-mb-15">
-                                <input type="tel" name="whatsapp" id="whatsappNumber" class="form-control"
-                                    placeholder="WhatsApp Number">
-                                <small id="validationMessage" style="color:red; display:none;"></small>
-                            </div>
+                            <x-forms.intl-phone-input
+                                name="whatsapp"
+                                id="whatsappNumber"
+                                placeholder="WhatsApp Number"
+                                :optional="true"
+                                error-target="validationMessage"
+                                invalid-message="Please enter a valid WhatsApp number or leave it empty."
+                            />
 
-                            <!-- HR Dropdown for Agent -->
+                            <!-- HR Dropdown -->
                             <div id="hrResourceContainer" style="display:none;" class="fromGroup rt-mb-15">
-                                <select name="hr_resource" class="form-control">
+                                <select name="hr_resource" id="hr_resource" class="form-control">
                                     <option selected>{{ __('select_one') }}</option>
                                     @foreach($roles as $role)
                                         <option value="{{ $role->id }}">{{ ucfirst($role->name) }}</option>
@@ -99,32 +162,79 @@ $type = request()->get('type');
                                 </select>
                             </div>
 
-                            <!-- Password -->
-                            <div class="fromGroup rt-mb-15 position-relative">
-                                <input type="password" name="password" id="password" class="form-control"
-                                    placeholder="{{ __('password') }}">
-                                <div onclick="togglePassword('password','eyeIcon')" id="eyeIcon" class="has-badge"
-                                    style="position:absolute; top:50%; right:10px; cursor:pointer;">
-                                    <i class="ph-eye"></i>
-                                </div>
+                            <!-- Company Registration Number (company only) -->
+                            <div class="fromGroup rt-mb-15" id="regNumberGroup" style="display:none">
+                                <input type="text"
+                                       name="registration_number"
+                                       id="registration_number"
+                                       value="{{ old('registration_number') }}"
+                                       class="form-control @error('registration_number') is-invalid @enderror"
+                                       placeholder="Company Registration Number (e.g. CR-12345)">
+                                <small class="text-muted">Required for company accounts. Use your official trade/CR number.</small>
+                                @error('registration_number')
+                                    <small class="text-danger d-block">{{ $message }}</small>
+                                @enderror
                             </div>
 
-                            <!-- Confirm Password -->
-                            <div class="fromGroup rt-mb-15 position-relative">
-                                <input type="password" name="password_confirmation" id="password_confirmation"
-                                    class="form-control" placeholder="{{ __('confirm_password') }}">
-                                <div onclick="togglePassword('password_confirmation','eyeIcon2')" id="eyeIcon2"
-                                    class="has-badge" style="position:absolute; top:50%; right:10px; cursor:pointer;">
-                                    <i class="ph-eye"></i>
-                                </div>
+                            <!-- Agency MPD License Number (agency only) -->
+                            <div class="fromGroup rt-mb-15" id="licenseNumberGroup" style="display:none">
+                                <input type="text"
+                                       name="license_number"
+                                       id="license_number"
+                                       value="{{ old('license_number') }}"
+                                       class="form-control @error('license_number') is-invalid @enderror"
+                                       placeholder="MPD / Agency License Number (e.g. 2978, MPD-2978)">
+                                <small class="text-muted">Required for recruitment agencies. Use your official BEOE / MPD license number.</small>
+                                @error('license_number')
+                                    <small class="text-danger d-block">{{ $message }}</small>
+                                @enderror
                             </div>
+
+                            <!-- Password -->
+<div class="fromGroup rt-mb-15 position-relative">
+    <input type="password"
+           name="password"
+           id="password"
+           class="form-control @error('password') is-invalid @enderror"
+           placeholder="{{ __('password') }}"
+           minlength="8"
+           maxlength="16"
+           required>
+
+    <div onclick="togglePassword('password','eyeIcon')"
+         id="eyeIcon"
+         style="position:absolute; top:50%; right:10px; cursor:pointer;">
+        <i class="ph-eye"></i>
+    </div>
+    <small class="text-danger" id="passwordError"></small>
+    @error('password')<small class="text-danger">{{ $message }}</small>@enderror
+</div>
+
+<!-- Confirm Password -->
+<div class="fromGroup rt-mb-15 position-relative">
+    <input type="password"
+           name="password_confirmation"
+           id="password_confirmation"
+           class="form-control"
+           placeholder="{{ __('confirm_password') }}"
+           minlength="8"
+           maxlength="16"
+           required>
+           
+    <div onclick="togglePassword('password_confirmation','eyeIcon2')" 
+         id="eyeIcon2"
+         style="position:absolute; top:50%; right:10px; cursor:pointer;">
+        <i class="ph-eye"></i>
+    </div>
+</div>
+
 
                             <!-- Terms -->
                             <div class="d-flex flex-wrap rt-mb-30">
                                 <div class="flex-grow-1">
-                                    <div class="form-check from-chekbox-custom">
+                                    <div class="form-check">
                                         <input type="checkbox" id="term" class="form-check-input">
-                                        <label for="term" class="form-check-label">
+                                        <label for="term">
                                             {{ __('i_have_read_and_agree_with') }}
                                             <a href="{{ url('terms-condition') }}" target="_blank">
                                                 {{ __('terms_of_service') }}
@@ -135,104 +245,222 @@ $type = request()->get('type');
                             </div>
 
                             <!-- Submit -->
-                            <button id="submitButton" type="submit" class="btn btn-primary d-block" disabled>
+                            <button id="submitButton" type="submit" class="btn btn-primary w-100" disabled>
                                 {{ __('create_account') }}
                             </button>
 
                         </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                        <!-- ===== YOUR ORIGINAL FORM END ===== -->
 
-    {{-- Right Panel: Illustration & Stats --}}
-    <div class="login-right flex-fill d-none d-lg-flex align-items-center justify-content-center position-relative">
-        <div class="sidebar-bg position-absolute w-100 h-100" style="background-image: url('../images/hrms-illustration.png'); background-size: cover; background-position: center;"></div>
-        <div class="stats-overlay text-center text-white z-2 p-4">
-            <h4 class="fw-bold">120 {{ __('open_jobs_waiting_for_you') }}</h4>
-            <div class="d-flex gap-3 justify-content-center mt-4 flex-wrap">
-                <div class="stat-card p-3 rounded bg-dark bg-opacity-50">
-                    <svg width="30" height="30"><circle cx="15" cy="15" r="13" stroke="white" stroke-width="2" fill="none"/></svg>
-                    <div class="h4 fw-bold">35</div>
-                    <small>{{ __('live_job') }}</small>
-                </div>
-                <div class="stat-card p-3 rounded bg-dark bg-opacity-50">
-                    <svg width="30" height="30"><rect x="5" y="5" width="20" height="20" stroke="white" stroke-width="2" fill="none"/></svg>
-                    <div class="h4 fw-bold">50</div>
-                    <small>{{ __('companies') }}</small>
-                </div>
-                <div class="stat-card p-3 rounded bg-dark bg-opacity-50">
-                    <svg width="30" height="30"><polygon points="15,5 25,25 5,25" stroke="white" stroke-width="2" fill="none"/></svg>
-                    <div class="h4 fw-bold">200</div>
-                    <small>{{ __('candidates') }}</small>
+                    </div>
+
                 </div>
             </div>
+
         </div>
     </div>
 
 </div>
-<!---end-->
 @endsection
+
+
 @section('style')
 <style>
-    .login-page { min-height: 100vh; }
-    .glass-card {
-        background: rgba(255, 255, 255, 0.6);
-        backdrop-filter: blur(12px);
-        border-radius: 20px;
-        transition: all 0.3s;
+.login-page {
+    background: #f8fafc;
+}
+
+.role-blink {
+    color: #25478F;
+    font-weight: 700;
+    animation: blinkSoft 1.2s infinite;
+}
+
+@keyframes blinkSoft {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+/* LEFT SIDE */
+.promo-box {
+    padding: 60px;
+}
+
+.promo-box h1 {
+    font-size: 42px;
+    font-weight: 700;
+}
+
+.promo-box p {
+    margin: 20px 0;
+    color: #64748b;
+}
+
+.promo-list {
+    list-style: none;
+    padding: 0;
+}
+
+.promo-list li {
+    margin-bottom: 10px;
+}
+
+/* FORM */
+.form-wrapper {
+    display: flex;
+    justify-content: center;
+}
+
+.auth-box2 {
+    width: 100%;
+    max-width: 420px;
+    padding: 35px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.08);
+}
+
+/* INPUT */
+.form-control {
+    border-radius: 8px;
+    height: 45px;
+}
+
+/* BUTTON */
+.btn-primary {
+    border-radius: 8px;
+    height: 45px;
+}
+
+/* MOBILE */
+@media(max-width: 992px){
+    .promo-box {
+        display: none;
     }
-    .glass-card:hover { transform: translateY(-5px); }
-
-    .role-option { cursor: pointer; border: 1px solid #ddd; transition: 0.3s; padding: 0.5rem; }
-    .role-option:hover { border-color: #007bff; }
-    .role-option input { display: none; }
-
-    .stat-card { width: 120px; text-align: center; transition: transform 0.3s; }
-    .stat-card:hover { transform: translateY(-5px); }
-
-    .toggle-password { background: transparent; border: none; cursor: pointer; }
-
-    .social-login .btn { transition: transform 0.2s; }
-    .social-login .btn:hover { transform: translateY(-2px); }
+}
 </style>
 @endsection
+
+
 @section('script')
-<script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"></script>
 <script>
-    // Password toggle
-    function togglePassword(fieldId, iconId){
-        let field = document.getElementById(fieldId);
-        let icon = document.getElementById(iconId).querySelector('i');
-        if(field.type === 'password'){ field.type='text'; icon.classList.replace('ph-eye','ph-eye-slash'); }
-        else{ field.type='password'; icon.classList.replace('ph-eye-slash','ph-eye'); }
+// PASSWORD TOGGLE (UNCHANGED)
+function togglePassword(fieldId, iconId){
+    let field = document.getElementById(fieldId);
+    let icon = document.getElementById(iconId).querySelector('i');
+
+    if(field.type === 'password'){
+        field.type='text';
+        icon.classList.replace('ph-eye','ph-eye-slash');
+    } else {
+        field.type='password';
+        icon.classList.replace('ph-eye-slash','ph-eye');
+    }
+}
+
+// ENABLE BUTTON (UNCHANGED)
+const formFields = ['name','email','password','password_confirmation'];
+const submitButton = document.getElementById('submitButton');
+const term = document.getElementById('term');
+
+function checkEnable(){
+    let enable = formFields.every(id => document.getElementById(id).value.length>0) && term.checked;
+    submitButton.disabled = !enable;
+}
+
+formFields.forEach(id => document.getElementById(id).addEventListener('keyup',checkEnable));
+term.addEventListener('change',checkEnable);
+
+// HR DROPDOWN — only for HR registration type
+const roleInput = document.getElementById('registrationRole');
+const typeInput = document.getElementById('registrationType');
+
+function syncHrResourceVisibility() {
+    const role = roleInput ? roleInput.value : '';
+    const hrContainer = document.getElementById('hrResourceContainer');
+    if (hrContainer) {
+        hrContainer.style.display = role === 'hr' ? 'block' : 'none';
+    }
+}
+
+if (roleInput) {
+    syncHrResourceVisibility();
+}
+</script>
+<script>
+document.getElementById('password').addEventListener('input', function () {
+    let password = this.value;
+    let error = document.getElementById('passwordError');
+
+    if (password.length < 8) {
+        error.innerText = "Password must be at least 8 characters.";
+    } 
+    else if (password.length > 16) {
+        error.innerText = "Password must not exceed 16 characters.";
+    } 
+    else {
+        error.innerText = "";
+    }
+});
+</script>
+<script>
+// ── Registration / license number fields: show based on registration type ──
+function syncRegNumberVisibility(type) {
+    const companyDocTypes = ['company', 'employer'];
+    const agencyLicenseTypes = ['agency'];
+    const isCompany = companyDocTypes.includes(type);
+    const isAgency  = agencyLicenseTypes.includes(type);
+
+    const regGrp  = document.getElementById('regNumberGroup');
+    const regInp  = document.getElementById('registration_number');
+    const licGrp  = document.getElementById('licenseNumberGroup');
+    const licInp  = document.getElementById('license_number');
+
+    if (regGrp) regGrp.style.display = isCompany ? 'block' : 'none';
+    if (regInp) {
+        regInp.required = isCompany;
+        if (!isCompany) regInp.value = '';
     }
 
-    // Enable submit button
-    const inputs = ['name','email','password','password_confirmation'];
-    const submitButton = document.getElementById('submitButton');
-    const term = document.getElementById('term');
-    function checkEnable(){
-        let enable = inputs.every(id => document.getElementById(id).value.length>0) && term.checked;
-        submitButton.disabled = !enable;
+    if (licGrp) licGrp.style.display = isAgency ? 'block' : 'none';
+    if (licInp) {
+        licInp.required = isAgency;
+        if (!isAgency) licInp.value = '';
     }
-    inputs.forEach(id => document.getElementById(id).addEventListener('keyup',checkEnable));
-    term.addEventListener('change',checkEnable);
+}
 
-    // Show HR dropdown if agent selected
-    document.querySelectorAll('input[name="role"]').forEach(radio=>{
-        radio.addEventListener('change',function(){
-            document.getElementById('hrResourceContainer').style.display = this.value==='agent'?'block':'none';
-        });
-    });
+// Re-evaluate the submit button when either number field changes
+const regInput = document.getElementById('registration_number');
+if (regInput) regInput.addEventListener('input', checkEnable);
 
-    // WhatsApp intl-tel-input
-    const input = document.querySelector("#whatsappNumber");
-    const iti = window.intlTelInput(input,{ initialCountry:"auto", separateDialCode:true, geoIpLookup:function(callback){ fetch("https://ipinfo.io/json?token=<YOUR_API_KEY>").then(r=>r.json()).then(d=>callback(d.country)).catch(()=>callback("us")); }, utilsScript:"https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/utils.js" });
-    input.form.addEventListener('submit',function(e){
-        if(!iti.isValidNumber()){ e.preventDefault(); document.getElementById('validationMessage').style.display='block'; document.getElementById('validationMessage').textContent='Please enter valid WhatsApp number'; }
-        else{ input.value = iti.getNumber(); }
-    });
+const licInput = document.getElementById('license_number');
+if (licInput) licInput.addEventListener('input', checkEnable);
+
+// Patch checkEnable to also require the active number field when visible
+const _origCheckEnable = checkEnable;
+checkEnable = function () {
+    const regGrp = document.getElementById('regNumberGroup');
+    const regInp = document.getElementById('registration_number');
+    const regOk  = !regGrp || regGrp.style.display === 'none' || (regInp && regInp.value.trim().length > 0);
+
+    const licGrp = document.getElementById('licenseNumberGroup');
+    const licInp = document.getElementById('license_number');
+    const licOk  = !licGrp || licGrp.style.display === 'none' || (licInp && licInp.value.trim().length > 0);
+
+    const enable = ['name','email','password','password_confirmation'].every(
+        id => document.getElementById(id).value.length > 0
+    ) && document.getElementById('term').checked && regOk && licOk;
+    document.getElementById('submitButton').disabled = !enable;
+};
+
+document.addEventListener("DOMContentLoaded", function () {
+    const params = new URLSearchParams(window.location.search);
+    const urlType = params.get('type');
+    const role = roleInput ? roleInput.value : '';
+    const type = urlType || (typeInput ? typeInput.value : '') || role;
+
+    syncRegNumberVisibility(type || role);
+    syncHrResourceVisibility();
+});
 </script>
 @endsection

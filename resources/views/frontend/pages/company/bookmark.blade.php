@@ -5,16 +5,28 @@
 @section('title', __('bookmarks'))
 
 @section('main')
-    <div class="dashboard-wrapper">
+    <div class="dashboard-wrapper seeker-module-page">
         <div class="container">
-            <div class="row">
-                {{-- Sidebar --}}
-                {{-- <x-website.company.sidebar /> --}}
+            <div class="dashboard-right">
 
-                <div class="col-lg-9">
+                <x-website.company.employer-page-header
+                    :title="__('bookmarks')"
+                    :subtitle="__('Saved candidates') . ' (' . $bookmarks->total() . ')'"
+                >
+                    <x-slot:actions>
+                        <a href="{{ route('company.bookmark.category.index') }}" class="pv-topbar-btn">
+                            <i class="fas fa-folder"></i> {{ __('category') }}
+                        </a>
+                    </x-slot:actions>
+                </x-website.company.employer-page-header>
+
+                <div class="glass-card">
+                <div class="glass-card-body">
+
+                <div class="col-lg-12">
                     <div class="dashboard-right tw-ps-0 lg:tw-ps-3">
                         <div class="row d-flex tw-flex-wrap justify-content-between p-2">
-                            <div class="col-sm-12 col-md-6">
+                            <div class="col-sm-12 col-md-6 d-none">
                                 <h3 class="f-size-18 lh-1 mb-2 p-2">
                                     {{ __('bookmarks') }}
                                     <span class="text-gray-400">({{ $bookmarks->total() }})</span>
@@ -185,13 +197,15 @@
                         </nav>
                     @endif
                 </div>
-            </div>
-        </div>
-        <!-- ============================= -->
-        <!-- Modal -->
+
+                </div>{{-- glass-card-body --}}
+                </div>{{-- glass-card --}}
+
+            </div>{{-- dashboard-right --}}
+        </div>{{-- container --}}
+
         <x-website.modal.candidate-profile-modal />
-        <!-- ============================= -->
-    </div>
+    </div>{{-- dashboard-wrapper --}}
 @endsection
 
 @section('frontend_links')

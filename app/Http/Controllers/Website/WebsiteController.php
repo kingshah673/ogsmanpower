@@ -11,6 +11,7 @@ use App\Models\Candidate;
 use App\Models\CandidateCvView;
 use App\Models\CandidateResume;
 use App\Models\Company;
+use App\Models\Agency;
 use App\Models\Education;
 use App\Models\Experience;
 use App\Models\ContactInfo;
@@ -30,6 +31,8 @@ use App\Notifications\Website\Candidate\BookmarkJobNotification;
 use App\Services\Website\Candidate\CandidateProfileDetailsService;
 use App\Services\Website\Company\CompanyDetailsService;
 use App\Services\Website\Company\CompanyListService;
+use App\Services\Website\Agency\AgencyDetailsService;
+use App\Services\Website\Agency\AgencyListService;
 use App\Services\Website\IndexPageService;
 use App\Services\Website\Job\JobListService;
 use App\Services\Website\PricePlanService;
@@ -87,22 +90,31 @@ class WebsiteController extends Controller
      
     public function downloadApplicantCv($cvId)
     {
-        // Retrieve the CV record from the database
-        $cv = AppliedJob::find($cvId); // Replace CVModel with your actual model
-        if (!$cv) {
+        $cv = AppliedJob::find($cvId);
+        if (! $cv || empty($cv->cv_path)) {
             return response()->json(['message' => 'CV not found'], 404);
         }
 
-        // Extract the path from the database (e.g., public/cvs/XN7tWoDwnN7nkQ6MHNMWuWV7KvTcFrMzeUHjc43L.pdf)
-        $path = $cv->cv_path; // Replace 'path' with the column name in your database
-
-        // Check if the file exists
-        if (!Storage::exists($path)) {
-            return response()->json(['message' => 'File not found'], 404);
+        $user = auth('user')->user() ?? auth()->user();
+        if (! $user) {
+            abort(403);
         }
 
-        // Download the file
-        return Storage::download($path);
+        // Candidate may download their own application CV; company/agency via ownership checks elsewhere.
+        if ($user->role === 'candidate') {
+            abort_unless((int) optional($user->candidate)->id === (int) $cv->candidate_id, 403);
+        }
+
+        $absolute = resolve_uploaded_file_path($cv->cv_path);
+        if ($absolute) {
+            return response()->download($absolute);
+        }
+
+        if (Storage::exists($cv->cv_path)) {
+            return Storage::download($cv->cv_path);
+        }
+
+        return response()->json(['message' => 'File not found'], 404);
     }
     public function downloadcv($id)
     {
@@ -141,7 +153,8 @@ class WebsiteController extends Controller
                 'bilangual_format' => 'frontend.pages.candidate.bilangual-resume',
             ];
 
-            $view = $viewMap[$appliedJob->resume_format] ?? $viewMap['general_format'];
+            $format = ($appliedJob->resume_format ?? null) ?: ($candidate->resume_format ?? 'general_format');
+            $view = $viewMap[$format] ?? $viewMap['general_format'];
             // $qrCode = base64_encode(QrCode::format('png')->size(80)->generate('https://example.com/candidate/'.$candidate->id));
             $qrCode = QrCode::size(70)->generate('https://example.com/candidate/' . $candidate->id);
 
@@ -161,10 +174,10 @@ class WebsiteController extends Controller
                 'translate' => $translate
             ];
 
-            if ($appliedJob->resume_format == 'bilangual_format') {
+            if ($format == 'bilangual_format') {
                 $htmlContent = view($view, $data)->render();
                 $mpdf = new Mpdf();
-                $mpdf->WriteHTML($htmlContent);
+                mpdf_write_html_chunked($mpdf, $htmlContent);
                 return $mpdf->Output('candidate_cv_' . $candidate->id . '.pdf', 'D');
             } else {
 
@@ -232,10 +245,11 @@ class WebsiteController extends Controller
                     $q->where('title', 'LIKE', "%$keyword%")
                         ->orWhere('description', 'LIKE', "%$keyword%");
                 })
-                ->whereRaw("FIND_IN_SET('public', job_roles)")
+                ->publicListing()
                 ->withoutEdited()
-                ->active()
-                ->get();
+                ->active();
+
+            $jobs = applyCandidateAgeFilter($jobs)->get();
             // dd($jobs);
             return view('frontend.pages.filterjob', compact('current_currency', 'jobs'));
         } catch (\Exception $e) {
@@ -251,18 +265,12 @@ class WebsiteController extends Controller
     }
     public function candidateByCountry($country)
     {
-    // Get country from countries table using sortname
-    $country = Country::where('sortname', $sortname)->first();
+        // Fetch candidates based on the country name
+        $candidates = Candidate::where('country', $country)->paginate(10);
 
-    if (!$country) {
-        abort(404);
+        // Return the filtered results to the view
+        return view('frontend.pages.candidates-by-country', compact('candidates', 'country'));
     }
-
-    // Match with candidates table using country NAME
-    $candidates = Candidate::where('country', $country->name)->paginate(10);
-
-    return view('frontend.pages.candidates-by-country', compact('candidates', 'country'));
-}
     public function jobsByCountry($country)
     {
         $current_currency = currentCurrency();
@@ -351,6 +359,12 @@ class WebsiteController extends Controller
 
             return redirect()->route('company.dashboard');
         }
+        if (auth('user')->check() && authUser()->role == 'agency') {
+
+            storePlanInformation();
+
+            return redirect()->route('agency.dashboard');
+        }
 
         return redirect('login');
 
@@ -413,9 +427,8 @@ class WebsiteController extends Controller
 
             }
         } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
-
-            return back();
+            \Log::error('Homepage error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            abort(500, $e->getMessage());
         }
     }
 
@@ -547,46 +560,46 @@ class WebsiteController extends Controller
                     abort_if(currentCompany()->id != $job->company_id, 404);
                 }
             }
+            $job->recordPublicView();
+
+            if (auth('user')->check() && authUser()->role === 'candidate') {
+                $candidate = authUser()->candidate;
+                if ($candidate && ! $job->acceptsCandidateAge($candidate->resolvedAge())) {
+                    flashError('This job is outside your age range.');
+
+                    return redirect()->route('website.job');
+                }
+            }
+
             $data = $this->getJobDetails($job);
             $data['questions'] = $job->questions;
-            if (auth()->check()) {
+            if (auth('user')->check() && authUser()->role === 'candidate') {
                 $candidate_id = auth()->user()->id;
 
-                $jobCondition = Job::where('id', $job->id)->first();
                 $data['eligible_candidate'] = Candidate::where('user_id', $candidate_id);
 
-                if ($jobCondition->city_limit == 1) {
-                    $data['eligible_candidate'] = $data['eligible_candidate']->where('district', $jobCondition->district);
+                if ($job->city_limit == 1) {
+                    $data['eligible_candidate'] = $data['eligible_candidate']->where('district', $job->district);
                 }
 
-                if ($jobCondition->gender_limit == 1) {
-                    $data['eligible_candidate'] = $data['eligible_candidate']->where('gender', $jobCondition->gender);
+                if ($job->gender_limit == 1) {
+                    $data['eligible_candidate'] = $data['eligible_candidate']->where('gender', $job->gender);
                 }
 
-                if ($jobCondition->age_limit == 1) {
+                if ($job->experience_limit == 1) {
                     $data['eligible_candidate'] = $data['eligible_candidate']
-                        ->whereRaw('TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) >= ?', [$jobCondition->min_age])
-                        ->whereRaw('TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) <= ?', [$jobCondition->max_age]);
-                }
-
-                if ($jobCondition->experience_limit == 1) {
-
-                    // $data['eligible_candidate'] = $data['eligible_candidate']->where('experience_id','>=',$jobCondition->experience_id);
-                    $data['eligible_candidate'] = $data['eligible_candidate']
-                        ->whereHas('experience_translation', function ($query) use ($jobCondition) {
-                            $query->where('name', '>=', $jobCondition->experience->name);
+                        ->whereHas('experience_translation', function ($query) use ($job) {
+                            $query->where('name', '>=', $job->experience->name);
                         });
                 }
 
-                if ($jobCondition->education_limit == 1) {
-                    $data['eligible_candidate'] = $data['eligible_candidate']->where('education_id', $jobCondition->education_id);
+                if ($job->education_limit == 1) {
+                    $data['eligible_candidate'] = $data['eligible_candidate']->where('education_id', $job->education_id);
                 }
 
                 $data['eligible_candidate'] = $data['eligible_candidate']->first();
-                // dd( $data['eligible_candidate']);
-
             } else {
-                $data['eligible_candidate'] = Null;
+                $data['eligible_candidate'] = null;
             }
 
             return view('frontend.pages.job-details', $data);
@@ -606,6 +619,7 @@ class WebsiteController extends Controller
                     abort_if(currentCompany()->id != $job->company_id, 404);
                 }
             }
+            $job->recordPublicView();
             $data = $this->getJobDetails($job);
             $data['questions'] = $job->questions;
             $data['candidates'] = Candidate::all();
@@ -630,16 +644,40 @@ class WebsiteController extends Controller
         abort_if(auth('user')->check() && authUser()->role == 'candidate', 404);
 
         try {
-            $data['professions'] = Profession::all()->sortBy('name');
+            // Only professions used by visible candidates (full Profession::all is ~4.6k rows + translations and destroys page render time)
+            $professionIds = \App\Models\Candidate::query()
+                ->where('visibility', 1)
+                ->whereNotNull('profession_id')
+                ->distinct()
+                ->pluck('profession_id');
+
+            $data['professions'] = Profession::query()
+                ->whereIn('id', $professionIds)
+                ->get()
+                ->sortBy('name');
+
+            // Keep selected profession available even if not in the reduced set
+            if ($request->filled('profession') && ! $professionIds->contains((int) $request->profession)) {
+                $selected = Profession::find($request->profession);
+                if ($selected) {
+                    $data['professions'] = $data['professions']->push($selected)->sortBy('name');
+                }
+            }
+
             $data['candidates'] = $this->getCandidates($request);
             $data['experiences'] = Experience::all();
             $data['educations'] = Education::all();
-            $data['skills'] = Skill::all()->sortBy('name');
+            $data['skills'] = Skill::query()
+                ->whereHas('candidates', function ($q) {
+                    $q->where('visibility', 1);
+                })
+                ->get()
+                ->sortBy('name');
             $data['popularTags'] = Tag::popular()
                 ->withCount('tags')
                 ->latest('tags_count')
-                ->get()
-                ->take(10);
+                ->take(10)
+                ->get();
 
             // reset candidate cv views history
             $this->reset();
@@ -793,33 +831,71 @@ class WebsiteController extends Controller
     public function candidateDownloadCv(CandidateResume $resume)
     {
         try {
+            $user = auth('user')->user() ?? auth()->user();
+            if (! $user) {
+                abort(403);
+            }
 
+            $allowed = false;
 
-            $company_id = auth()->user()->companyId();
-            $hasCandidate = DB::table('applied_jobs')
-                ->whereIn('job_id', function ($query) use ($company_id) {
-                    $query->select('id')
-                        ->from('jobs')
-                        ->where('company_id', $company_id);
-                })
-                ->where('candidate_id', $resume->candidate_id)
-                ->exists();
-            // $user = auth()->user();
-            // $hasCandidate = $user->company->applicationGroups()->whereHas('applications.candidate', function ($query) use ($user, $resume) {
-            //     $query->where('user_id', $user->id)
-            //         ->where('id', $resume->candidate_id);
-            // })->exists();
+            if ($user->role === 'candidate') {
+                $allowed = (int) optional($user->candidate)->id === (int) $resume->candidate_id;
+            } elseif ($user->role === 'company') {
+                $companyId = method_exists($user, 'companyId') ? $user->companyId() : optional($user->company)->id;
+                if ($companyId) {
+                    $allowed = DB::table('applied_jobs')
+                        ->where('candidate_id', $resume->candidate_id)
+                        ->where(function ($q) use ($companyId) {
+                            $q->where('company_id', $companyId)
+                                ->orWhereIn('job_id', function ($query) use ($companyId) {
+                                    $query->select('id')
+                                        ->from('jobs')
+                                        ->where('company_id', $companyId);
+                                });
+                        })
+                        ->exists();
+                }
+            } elseif ($user->role === 'agency') {
+                $agencyId = optional($user->agency)->id;
+                if ($agencyId) {
+                    $allowed = DB::table('applied_jobs')
+                        ->where('candidate_id', $resume->candidate_id)
+                        ->where(function ($q) use ($agencyId) {
+                            $q->where('agency_id', $agencyId)
+                                ->orWhereIn('job_id', function ($query) use ($agencyId) {
+                                    $query->select('id')
+                                        ->from('jobs')
+                                        ->where('agency_id', $agencyId);
+                                });
+                        })
+                        ->exists();
+                }
+            } elseif (in_array($user->role, ['admin', 'superadmin'], true)) {
+                $allowed = true;
+            }
 
-            if (! $hasCandidate) {
+            if (! $allowed) {
+                flashError('You are not allowed to download this CV.');
+
                 return redirect()->back();
             }
 
-            $filePath = $resume->file;
-            $filename = time() . '.pdf';
-            $headers = ['Content-Type: application/pdf', 'filename' => $filename];
-            $fileName = rand() . '-resume' . '.pdf';
+            $absolute = resolve_uploaded_file_path($resume->file);
 
-            return response()->download($filePath, $fileName, $headers);
+            if (! $absolute) {
+                flashError('Resume file not found.');
+
+                return redirect()->back();
+            }
+
+            $ext = strtolower(pathinfo($absolute, PATHINFO_EXTENSION) ?: 'pdf');
+            $base = preg_replace('/[^A-Za-z0-9_\- ]+/', '', (string) ($resume->name ?: 'resume')) ?: 'resume';
+            $downloadName = $base.'.'.$ext;
+            $mime = @mime_content_type($absolute) ?: 'application/octet-stream';
+
+            return response()->download($absolute, $downloadName, [
+                'Content-Type' => $mime,
+            ]);
         } catch (\Exception $e) {
             flashError('An error occurred: ' . $e->getMessage());
 
@@ -858,6 +934,10 @@ class WebsiteController extends Controller
 
             $user = User::where('role', 'company')->where('username', $username)->first();
 
+            if ($user && auth('user')->check() && auth('user')->id() === $user->id && $user->company) {
+                activateEligiblePendingJobs($user->company);
+            }
+
             $data = (new CompanyDetailsService)->execute($user);
 
             return view('frontend.pages.employe-details', $data);
@@ -894,37 +974,150 @@ class WebsiteController extends Controller
      * @return \Illuminate\Contracts\Support\Renderable
      */
     public function pricing()
-    {
-        try {
-            abort_if(auth('user')->check() && authUser()->role == 'candidate', 404);
-            $plans = Plan::active()->get();
-            $plan_descriptions = $plans->pluck('descriptions')->flatten();
+{
+    try {
 
-            $current_language = currentLanguage();
-            $current_currency = currentCurrency();
-            $current_language_code = $current_language ? $current_language->code : config('templatecookie.default_language');
-            $faqs = Faq::where('code', currentLangCode())
-                ->with('faq_category')
-                ->whereHas('faq_category', function ($query) {
-                    $query->where('name', 'Plan');
-                })
-                ->get();
+        /*
+        |--------------------------------------------------------------------------
+        | CURRENT USER TYPE
+        |--------------------------------------------------------------------------
+        */
 
-            if ($current_language_code) {
-                $plans->load([
-                    'descriptions' => function ($q) use ($current_language_code) {
-                        $q->where('locale', $current_language_code);
-                    },
-                ]);
+        $userType = null;
+
+        if(auth('user')->check()){
+
+            $user = auth('user')->user();
+
+            if($user->role == 'company'){
+
+                $userType = 'company';
+
+            }elseif($user->role == 'agency'){
+
+                $userType = 'agency';
+
+            }elseif($user->role == 'agent'){
+
+                $userType = 'agent';
+
+            }else{
+
+                $userType = 'candidate';
             }
-
-            return view('frontend.pages.pricing', compact('plans', 'faqs', 'current_language', 'plan_descriptions', 'current_currency', 'current_language_code'));
-        } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
-
-            return back();
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PLANS
+        |--------------------------------------------------------------------------
+        */
+
+        $plans = Plan::query()
+
+            ->where('is_active',1)
+
+            ->where('frontend_show',1)
+
+            ->when($userType,function($query) use ($userType){
+
+                $query->where('user_type',$userType);
+
+            })
+
+            ->with([
+
+                'descriptions' => function($q){
+
+                    $q->where(
+                        'locale',
+                        currentLangCode()
+                    );
+
+                },
+
+                'features'
+
+            ])
+
+            ->orderBy('price')
+
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | PLAN DESCRIPTIONS
+        |--------------------------------------------------------------------------
+        */
+
+        $plan_descriptions = $plans
+            ->pluck('descriptions')
+            ->flatten();
+
+        /*
+        |--------------------------------------------------------------------------
+        | LANGUAGE & CURRENCY
+        |--------------------------------------------------------------------------
+        */
+
+        $current_language = currentLanguage();
+
+        $current_currency = currentCurrency();
+
+        $current_language_code = $current_language
+            ? $current_language->code
+            : config('templatecookie.default_language');
+
+        /*
+        |--------------------------------------------------------------------------
+        | FAQS
+        |--------------------------------------------------------------------------
+        */
+
+        $faqs = Faq::where('code', currentLangCode())
+
+            ->with('faq_category')
+
+            ->whereHas('faq_category', function ($query) {
+
+                $query->where('name', 'Plan');
+
+            })
+
+            ->latest()
+
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | VIEW
+        |--------------------------------------------------------------------------
+        */
+
+        return view(
+
+            'frontend.pages.pricing',
+
+            compact(
+
+                'plans',
+                'faqs',
+                'current_language',
+                'plan_descriptions',
+                'current_currency',
+                'current_language_code'
+            )
+        );
+
+    } catch (\Exception $e) {
+
+        flashError(
+            'An error occurred: ' . $e->getMessage()
+        );
+
+        return back();
     }
+}
 
     /**
      * Plan details page
@@ -939,7 +1132,7 @@ class WebsiteController extends Controller
             abort_if(auth('user')->check() && auth('user')->user()->role == 'candidate', 404);
 
             $data = (new PricePlanService)->details($label);
-            $plan = CandidatePlan::first();
+            $plan = candidateFeaturedPlan();
 
             return view('frontend.pages.plan-details', $data ,compact('plan'));
         } catch (\Exception $e) {
@@ -952,7 +1145,7 @@ class WebsiteController extends Controller
     {
         try {
             // dd('sds');
-            $plan=CandidatePlan::first();
+            $plan = candidateFeaturedPlan();
             $mid_token =  null;
 
             $manual_payments = ManualPayment::whereStatus(1)->get();
@@ -1029,89 +1222,278 @@ class WebsiteController extends Controller
 {
     try {
 
+        /*
+        |--------------------------------------------------------------------------
+        | VALIDATION
+        |--------------------------------------------------------------------------
+        */
+
         $validator = Validator::make(
             $request->all(),
             [
-                'resume_format' => 'required',
-                'cover_letter' => 'required',
+                'resume' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
+                'resume_id' => 'nullable|integer',
+                'cover_letter' => 'nullable|string',
             ],
             [
-                'resume_format.required' => 'Please select resume',
-                'cover_letter.required' => 'Please enter cover letter',
+                'resume.mimes' => 'Resume must be PDF, DOC or DOCX',
+                'resume.max' => 'Resume size must be less than 5MB',
             ]
         );
 
         if ($validator->fails()) {
+
             flashError($validator->errors()->first());
+
             return back();
+
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CANDIDATE
+        |--------------------------------------------------------------------------
+        */
 
         $candidate = auth('user')->user()->candidate;
 
-       // Recalculate profile completion
-        $candidate->profile_complete = $candidate->calculateProfileCompletion();
-            $candidate->save();
+        if (!$candidate) {
 
-            // Profile completion check
-            if ($candidate->profile_complete < 80) {
+            flashError('Candidate profile not found.');
 
-    flashError('Please complete at least 80% of your profile before applying for jobs.');
+            return back();
 
-    return redirect()->route('candidate.setting');
-}
+        }
 
-        $job = Job::find($request->id);
+        /*
+        |--------------------------------------------------------------------------
+        | PROFILE COMPLETION
+        |--------------------------------------------------------------------------
+        */
 
-        if (!$job) {
+        $candidate->profile_complete =
+            $candidate->calculateProfileCompletion();
+
+        $candidate->save();
+
+        if ($candidate->profile_complete < 80) {
+
+            flashError(
+                'Please complete at least 80% of your profile before applying for jobs.'
+            );
+
+            return redirect()->route('candidate.setting');
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | JOB
+        |--------------------------------------------------------------------------
+        */
+
+        $job = Job::query()
+            ->when(
+                filled($request->id) && is_numeric($request->id),
+                fn ($q) => $q->where('id', (int) $request->id),
+                fn ($q) => $q->where('slug', $request->id ?? $request->slug)
+            )
+            ->first();
+
+        if (! $job) {
             flashError('Job not found.');
+
             return back();
         }
 
-        // Prevent duplicate job application
+        if (! $job->acceptsCandidateAge($candidate->resolvedAge())) {
+            flashError('This job is outside your age range. Please update your date of birth in settings if it is incorrect.');
+
+            return back();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | DUPLICATE CHECK
+        |--------------------------------------------------------------------------
+        */
+
         $alreadyApplied = DB::table('applied_jobs')
             ->where('candidate_id', $candidate->id)
             ->where('job_id', $job->id)
             ->exists();
 
         if ($alreadyApplied) {
+
             flashError('You have already applied for this job.');
+
             return back();
+
         }
 
-        DB::table('applied_jobs')->insert([
-            'candidate_id' => $candidate->id,
-            'job_id' => $job->id,
-            'company_id' => $job->company_id ?? 0,
-            'cover_letter' => $request->cover_letter,
-            'resume_format' => $request->resume_format,
-            'application_group_id' => $job->company->applicationGroups
-                ->where('is_deleteable', false)
-                ->first()->id ?? 1,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        /*
+        |--------------------------------------------------------------------------
+        | RESUME: prefer existing profile CV, or new upload for this application
+        |--------------------------------------------------------------------------
+        */
 
-        // Notify company
-        $job->company->user->notify(
-            new ApplyJobNotification(auth('user')->user(), $job->company->user, $job)
-        );
+        $candidateResumeId = null;
 
-        // Notify candidate
-        if (auth('user')->user()->recent_activities_alert) {
-            auth('user')->user()->notify(
-                new ApplyJobNotification(auth('user')->user(), $job->company->user, $job)
+        if ($request->hasFile('resume')) {
+            $uploaded = $request->file('resume');
+            $filePath = uploadFileToPublic($uploaded, 'file/candidates/');
+
+            $candidateResume = CandidateResume::create([
+                'candidate_id' => $candidate->id,
+                'name' => pathinfo($uploaded->getClientOriginalName(), PATHINFO_FILENAME) ?: 'Apply Resume',
+                'file' => $filePath,
+            ]);
+
+            $candidateResumeId = $candidateResume->id;
+        } elseif ($request->filled('resume_id')) {
+            $existing = CandidateResume::query()
+                ->where('candidate_id', $candidate->id)
+                ->where('id', (int) $request->resume_id)
+                ->first();
+
+            if (! $existing) {
+                flashError('Selected resume was not found on your profile.');
+
+                return back();
+            }
+
+            $candidateResumeId = $existing->id;
+        } else {
+            $fallback = $candidate->resumes()->latest('id')->first();
+            if ($fallback) {
+                $candidateResumeId = $fallback->id;
+            } else {
+                flashError('Please upload a resume or add one in your profile settings.');
+
+                return back();
+            }
+        }
+
+        $user = auth('user')->user();
+        $phone = $request->input('full_phone') ?: $request->input('phone');
+        if (filled($phone)) {
+            // users.whatsapp is the primary contact number column; phone is ensured via schema:ensure
+            $user->whatsapp = $phone;
+            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'phone')) {
+                $user->phone = $phone;
+            }
+            $user->save();
+
+            ContactInfo::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'phone' => $phone,
+                    'whatsapp_number' => $phone,
+                ]
             );
         }
 
-        flashSuccess(__('job_applied_successfully'));
+        /*
+        |--------------------------------------------------------------------------
+        | APPLICATION GROUP
+        |--------------------------------------------------------------------------
+        */
 
-        return back();
+        $applicationGroupId = 1;
 
+        if (
+            $job->company &&
+            $job->company->applicationGroups
+        ) {
+
+            $group = $job->company->applicationGroups
+                ->where('is_deleteable', false)
+                ->first();
+
+            if ($group) {
+
+                $applicationGroupId = $group->id;
+
+            }
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | INSERT APPLICATION
+        |--------------------------------------------------------------------------
+        */
+
+        AppliedJob::create([
+            'candidate_id' => $candidate->id,
+            'job_id' => $job->id,
+            'company_id' => $job->company_id ?: null,
+            'agency_id' => $job->agency_id ?: null,
+            'cover_letter' => $request->cover_letter,
+            'candidate_resume_id' => $candidateResumeId,
+            'resume_format' => $candidate->resume_format ?: null,
+            'application_group_id' => $applicationGroupId,
+            'status' => 'pending',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | COMPANY NOTIFICATION
+        |--------------------------------------------------------------------------
+        */
+
+        if ($job->company && $job->company->user) {
+
+            $job->company->user->notify(
+
+                new ApplyJobNotification(
+                    auth('user')->user(),
+                    $job->company->user,
+                    $job
+                )
+
+            );
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CANDIDATE NOTIFICATION
+        |--------------------------------------------------------------------------
+        */
+
+        if (auth('user')->user()->recent_activities_alert) {
+
+            auth('user')->user()->notify(
+
+                new ApplyJobNotification(
+                    auth('user')->user(),
+                    $job->company->user,
+                    $job
+                )
+
+            );
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUCCESS
+        |--------------------------------------------------------------------------
+        */
+
+        return redirect()
+    ->back()
+    ->with('success', 'Job applied successfully');
+    
     } catch (\Exception $e) {
 
-        flashError('An error occurred: ' . $e->getMessage());
+        flashError(
+            'An error occurred: ' . $e->getMessage()
+        );
 
         return back();
+
     }
 }
 
@@ -1267,11 +1649,9 @@ class WebsiteController extends Controller
                     ->markAsRead();
             }
 
-            return true;
+            return response()->json(['success' => true]);
         } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
-
-            return back();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
@@ -1533,5 +1913,13 @@ class WebsiteController extends Controller
 
             return back();
         }
+    }
+
+    /**
+     * Placeholder page for features / portals not yet launched.
+     */
+    public function comingSoon()
+    {
+        return view('errors.comingsoon');
     }
 }

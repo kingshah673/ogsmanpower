@@ -26,7 +26,11 @@ trait GetMenuTrait
                 ->map(function ($data) {
                     $translations = $data->translations;
                     $get_en_item = $translations->where('locale', 'en')->first();
+                    $locale = app()->getLocale();
+                    $current = $translations->where('locale', $locale)->first()
+                        ?? $translations->where('locale', config('templatecookie.default_language', 'en'))->first();
                     $data->en_title = $get_en_item ? $get_en_item->title : '';
+                    $data->title = $current ? $current->title : $data->en_title;
 
                     return $data;
                 })

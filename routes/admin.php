@@ -11,6 +11,9 @@ use App\Http\Controllers\Admin\CandidateLanguageController;
 use App\Http\Controllers\Admin\CmsController;
 use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\CompanyInputController;
+use App\Http\Controllers\Admin\EmployerVerificationDocumentTypeController;
+use App\Http\Controllers\Admin\AgencyController;
+use App\Http\Controllers\Admin\AgencyInputController;
 use App\Http\Controllers\Admin\EducationController;
 use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\ExperienceController;
@@ -36,15 +39,36 @@ use App\Http\Controllers\Admin\TagController;
 use App\Http\Controllers\Admin\TeamSizeController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\AgentController;
+use App\Http\Controllers\Admin\BrokerController;
+use App\Http\Controllers\Admin\BrokerDemandController;
 use App\Http\Controllers\Admin\RoleOtpMethodController;
 use App\Http\Controllers\CityController;
 use App\Http\Controllers\SearchCountryController;
 use App\Http\Controllers\StateController;
 use App\Http\Controllers\Website\WebsiteSettingController;
-
+use App\Http\Controllers\Admin\ContractTemplateController;
+use App\Http\Controllers\Admin\ChatLeadController;
+use App\Http\Controllers\AboutPageController;
+use App\Http\Controllers\Admin\AdminAboutController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\JobAiTemplateController;
+use App\Http\Controllers\Admin\VisaProcessingFlowController;
+use App\Http\Controllers\Admin\VisaProcessingCaseController;
+use App\Http\Controllers\Admin\NominatedWorkerController as AdminNominatedWorkerController;
 
-Route::prefix('admin')->group(function () {
+use App\Http\Controllers\Admin\AIKnowledgeBaseController;
+use App\Http\Controllers\Admin\AISettingsController;
+use App\Http\Controllers\Admin\AIKnowledgeController;
+use App\Http\Controllers\Admin\AnalyticsController;
+use App\Http\Controllers\Admin\CopilotController;
+use App\Http\Controllers\Admin\AIChatController;
+use App\Http\Controllers\Admin\WhatsAppChatController;
+use App\Http\Controllers\Admin\AIHandoverController;
+use App\Http\Controllers\Admin\AINotificationController;
+use App\Http\Controllers\Admin\FooterPanelController;
+use App\Http\Controllers\Admin\FooterItemController;
+
+Route::prefix('admin')->middleware('portal_user_admin_guard')->group(function () {
     /**
      * Auth routes
      */
@@ -52,6 +76,7 @@ Route::prefix('admin')->group(function () {
     Route::post('/login', [LoginController::class, 'login'])->name('admin.login')->middleware('prevent_cache');
     Route::post('/logout', [LoginController::class, 'logout'])->name('admin.logout');
     Route::get('view_cv/{candidate}', [CandidateController::class, 'view_cv'])->name('admin.view_cv');
+    
 
 
     Route::middleware(['guest:admin'])->group(function () {
@@ -80,8 +105,8 @@ Route::prefix('admin')->group(function () {
             ->prefix('roles')
             ->name('roles.')
             ->group(function () {
-                // Route::get('/otp-methods', 'index')->name('otp-methods.index');
                 Route::get('/otp-methods', 'index')->name('otp-methods.index');
+                Route::post('/otp-settings', 'saveOtpSettings')->name('otp-settings.save');
                 Route::get('/{role}/otp-methods/edit', 'edit')->name('otp-methods.edit');
                 Route::put('/{role}/otp-methods', 'update')->name('otp-methods.update');
             });
@@ -90,21 +115,74 @@ Route::prefix('admin')->group(function () {
         Route::resource('user', UserController::class)->only(['dashboard', 'index', 'create', 'store', 'edit', 'update', 'destroy']);
 
         Route::get('/company/{company}/documents', [CompanyController::class, 'documents'])->name('admin.company.documents');
+        Route::get('/company/{company}/documents/{fileType}/preview', [CompanyController::class, 'previewDocument'])->name('admin.company.documents.preview');
         Route::get('/company/{company}/documents/change', [CompanyController::class, 'toggle'])->name('admin.document.verify.change');
+        Route::post('/company/{company}/documents/request-resubmit', [CompanyController::class, 'requestDocumentResubmit'])->name('admin.company.documents.request_resubmit');
+        Route::post('/company/{company}/documents/assignments', [CompanyController::class, 'syncDocumentAssignments'])->name('admin.company.documents.assignments');
 
         Route::post('/company/{company}/documents', [CompanyController::class, 'downloadDocument'])->name('company.verify.documents.download');
-        //Company Route resource
+        
+        Route::get('/agency/{agency}/documents', [AgencyController::class, 'documents'])->name('admin.agency.documents');
+        Route::get('/agency/{agency}/documents/change', [AgencyController::class, 'toggle'])->name('admin.agency.document.verify.change');
+
+        Route::post('/agency/{agency}/documents', [AgencyController::class, 'downloadDocument'])->name('agency.verify.documents.download');
+        // Company dynamic inputs — MUST be registered before Route::resource('company')
+        // or /admin/company/dynamic-inputs is resolved as company show with id "dynamic-inputs".
+        Route::get('company/dynamic-inputs', [CompanyController::class, 'dynamic_inputs'])->name('admin.company.dynamic_inputs');
+        Route::get('company/verification-document-types', [EmployerVerificationDocumentTypeController::class, 'index'])->name('admin.company.verification_document_types.index');
+        Route::post('company/verification-document-types', [EmployerVerificationDocumentTypeController::class, 'store'])->name('admin.company.verification_document_types.store');
+        Route::put('company/verification-document-types/{documentType}', [EmployerVerificationDocumentTypeController::class, 'update'])->name('admin.company.verification_document_types.update');
+        Route::delete('company/verification-document-types/{documentType}', [EmployerVerificationDocumentTypeController::class, 'destroy'])->name('admin.company.verification_document_types.destroy');
+        Route::post('company/verification-document-types/{documentType}/toggle-active', [EmployerVerificationDocumentTypeController::class, 'toggleActive'])->name('admin.company.verification_document_types.toggle_active');
+        Route::post('company/add_dynamic_input', [CompanyInputController::class, 'store'])->name('company.add_dynamic_input');
+        Route::delete('company/delete_dynamic_input/{id}', [CompanyInputController::class, 'destroy'])->name('company.delete_dynamic_input');
+        Route::post('company/toggle_active', [CompanyInputController::class, 'toggleActive'])->name('company.toggle_active');
+        Route::post('company/toggle_required', [CompanyInputController::class, 'toggleRequired'])->name('company.toggle_required');
 
         Route::resource('company', CompanyController::class);
         Route::get('/company/change/status', [CompanyController::class, 'statusChange'])->name('company.status.change');
+        Route::get('/company/registration/corporate-email', [CompanyController::class, 'corporateEmailRequirementChange'])->name('company.registration.corporate_email.change');
         Route::get('/company/verify/status', [CompanyController::class, 'verificationChange'])->name('company.verify.change');
         Route::get('/company/profile/verify/status', [CompanyController::class, 'profileVerificationChange'])->name('company.profile.verify.change');
+        
+        //Agency Route resource
 
-        Route::get('dynamic_inputs', [CompanyController::class, 'dynamic_inputs'])->name('admin.company.dyanmic_inputs');
-        Route::post('/company/add_dynamic_input', [CompanyInputController::class, 'store'])->name('company.add_dynamic_input');
-        Route::delete('/company/delete_dynamic_input/{id}', [CompanyInputController::class, 'destroy'])->name('company.delete_dynamic_input');
-        Route::post('/company/toggle_active', [CompanyInputController::class, 'toggleActive'])->name('company.toggle_active');
-        Route::post('/company/toggle_required', [CompanyInputController::class, 'toggleRequired'])->name('company.toggle_required');
+        Route::resource('agency', AgencyController::class);
+        Route::get('/agency/change/status', [AgencyController::class, 'statusChange'])->name('agency.status.change');
+        Route::get('/agency/verify/status', [AgencyController::class, 'verificationChange'])->name('agency.verify.change');
+        Route::get('/agency/profile/verify/status', [AgencyController::class, 'profileVerificationChange'])->name('agency.profile.verify.change');
+
+        Route::get('dynamic_inputs', [AgencyController::class, 'dynamic_inputs'])->name('admin.agency.dynamic_inputs');
+        Route::post('/agency/add_dynamic_input', [AgencyInputController::class, 'store'])->name('agency.add_dynamic_input');
+        Route::delete('/agency/delete_dynamic_input/{id}', [AgencyInputController::class, 'destroy'])->name('agency.delete_dynamic_input');
+        Route::post('/agency/toggle_active', [AgencyInputController::class, 'toggleActive'])->name('agency.toggle_active');
+        Route::post('/agency/toggle_required', [AgencyInputController::class, 'toggleRequired'])->name('agency.toggle_required');
+
+        // Agency commissions
+        Route::get('/commissions', [\App\Http\Controllers\Admin\CommissionController::class, 'index'])->name('commissions.index');
+        Route::patch('/commissions/{commission}/status', [\App\Http\Controllers\Admin\CommissionController::class, 'updateStatus'])->name('commissions.update-status');
+
+        // Broker / Middleman
+        Route::get('broker/demands', [BrokerDemandController::class, 'index'])->name('broker.demands.index');
+        Route::get('broker/demands/{id}', [BrokerDemandController::class, 'show'])->name('broker.demands.show');
+        Route::put('broker/demands/{id}', [BrokerDemandController::class, 'update'])->name('broker.demands.update');
+        Route::resource('broker', BrokerController::class);
+        Route::get('/broker/change/status', [BrokerController::class, 'statusChange'])->name('broker.status.change');
+        Route::get('/broker/verify/status', [BrokerController::class, 'verificationChange'])->name('broker.verify.change');
+        Route::get('/broker/profile/verify/status', [BrokerController::class, 'profileVerificationChange'])->name('broker.profile.verify.change');
+
+        // Agent / Facilitator status toggles
+        Route::get('/agent/change/status', [AgentController::class, 'statusChange'])->name('agent.status.change');
+        Route::get('/agent/verify/status', [AgentController::class, 'verificationChange'])->name('agent.verify.change');
+
+        // Seeker dynamic field definitions (global) — before candidate resource
+        Route::get('candidate/dynamic-inputs', [CandidateController::class, 'seekerDynamicInputs'])->name('admin.candidate.dynamic_inputs');
+        Route::get('candidate/{candidate}/dynamic-inputs', [CandidateController::class, 'dynamic_inputs'])->name('admin.candidate.candidate_dynamic_inputs');
+        Route::get('dynamic_input/{id}', [CandidateController::class, 'dynamic_input'])->name('admin.candidate.dyanmic_inputs');
+        Route::post('/candidate/add_dynamic_input', [DynamicInputController::class, 'store'])->name('candidate.add_dynamic_input');
+        Route::delete('/candidate/delete_dynamic_input/{id}', [DynamicInputController::class, 'destroy'])->name('candidate.delete_dynamic_input');
+        Route::post('/candidate/toggle_active', [DynamicInputController::class, 'toggleActive'])->name('candidate.toggle_active');
+        Route::post('/candidate/toggle_required', [DynamicInputController::class, 'toggleRequired'])->name('candidate.toggle_required');
 
         // Candidate Route
         Route::resource('candidate', CandidateController::class);
@@ -115,11 +193,6 @@ Route::prefix('admin')->group(function () {
         Route::get('/candidate/export/{type}', [CandidateController::class, 'candidateExport'])->name('candidate.export');
         Route::post('viewResume/{candidate}', [CandidateController::class, 'viewResume'])->name('admin.viewResume');
 
-        Route::get('dynamic_input/{id}', [CandidateController::class, 'dynamic_input'])->name('admin.candidate.dyanmic_inputs');
-        Route::post('/candidate/add_dynamic_input', [DynamicInputController::class, 'store'])->name('candidate.add_dynamic_input');
-        Route::delete('/candidate/delete_dynamic_input/{id}', [DynamicInputController::class, 'destroy'])->name('candidate.delete_dynamic_input');
-        Route::post('/candidate/toggle_active', [DynamicInputController::class, 'toggleActive'])->name('candidate.toggle_active');
-        Route::post('/candidate/toggle_required', [DynamicInputController::class, 'toggleRequired'])->name('candidate.toggle_required');
         Route::get('lang/home', [CandidateController::class, 'index']);
         Route::get('lang/change', [CandidateController::class, 'change_lang'])->name('changeLang');
         Route::get('candidate_status', [CandidateController::class, 'candidate_status'])->name('candidate-status');
@@ -137,7 +210,10 @@ Route::prefix('admin')->group(function () {
         Route::delete('/delete-resume-subscriptions/{id}', [CandidateController::class, 'deleteResumeSubscription'])->name('delete.resume.subscription');
         Route::get('/resume-subscription/{id}', [CandidateController::class, 'resumeSubscription'])->name('candidate.resume.subscription');
 
-
+        // Passport OCR Review
+        Route::get('/passport-ocr', [\App\Http\Controllers\Admin\PassportOcrController::class, 'index'])->name('admin.passport-ocr.index');
+        Route::post('/passport-ocr/{log}/confirm', [\App\Http\Controllers\Admin\PassportOcrController::class, 'confirm'])->name('admin.passport-ocr.confirm');
+        Route::get('/passport-ocr/{log}/reject', [\App\Http\Controllers\Admin\PassportOcrController::class, 'reject'])->name('admin.passport-ocr.reject');
 
         // Route::post('viewResume/$candidate->id', 'viewResume')->name('viewResume');
 
@@ -149,6 +225,38 @@ Route::prefix('admin')->group(function () {
         Route::resource('job', JobController::class);
         Route::get('/jobs/delete-selected', [JobController::class, 'deleteSelected'])->name('jobs.deleteSelected');
         Route::get('applied/jobs', [JobController::class, 'appliedJobs'])->name('applied.jobs');
+
+        // Visa Processing (new product)
+        Route::get('visa-flows', [VisaProcessingFlowController::class, 'index'])->name('admin.visa-flows.index');
+        Route::get('visa-flows/create', [VisaProcessingFlowController::class, 'create'])->name('admin.visa-flows.create');
+        Route::post('visa-flows', [VisaProcessingFlowController::class, 'store'])->name('admin.visa-flows.store');
+        Route::get('visa-flows/{visa_flow}/edit', [VisaProcessingFlowController::class, 'edit'])->name('admin.visa-flows.edit');
+        Route::put('visa-flows/{visa_flow}', [VisaProcessingFlowController::class, 'update'])->name('admin.visa-flows.update');
+        Route::post('visa-flows/{visa_flow}/publish', [VisaProcessingFlowController::class, 'publish'])->name('admin.visa-flows.publish');
+        Route::post('visa-flows/{visa_flow}/draft', [VisaProcessingFlowController::class, 'markDraft'])->name('admin.visa-flows.draft');
+        Route::post('visa-flows/{visa_flow}/steps', [VisaProcessingFlowController::class, 'storeStep'])->name('admin.visa-flows.steps.store');
+        Route::put('visa-steps/{step}', [VisaProcessingFlowController::class, 'updateStep'])->name('admin.visa-steps.update');
+        Route::post('visa-steps/{step}/move', [VisaProcessingFlowController::class, 'moveStep'])->name('admin.visa-steps.move');
+        Route::post('visa-steps/{step}/deactivate', [VisaProcessingFlowController::class, 'deactivateStep'])->name('admin.visa-steps.deactivate');
+        Route::delete('visa-steps/{step}', [VisaProcessingFlowController::class, 'destroyStep'])->name('admin.visa-steps.destroy');
+        Route::post('visa-steps/{step}/requirements', [VisaProcessingFlowController::class, 'storeRequirement'])->name('admin.visa-steps.requirements.store');
+        Route::put('visa-requirements/{requirement}', [VisaProcessingFlowController::class, 'updateRequirement'])->name('admin.visa-requirements.update');
+        Route::post('visa-requirements/{requirement}/deactivate', [VisaProcessingFlowController::class, 'deactivateRequirement'])->name('admin.visa-requirements.deactivate');
+        Route::delete('visa-requirements/{requirement}', [VisaProcessingFlowController::class, 'destroyRequirement'])->name('admin.visa-requirements.destroy');
+
+        Route::get('visa-cases', [VisaProcessingCaseController::class, 'index'])->name('admin.visa-cases.index');
+        Route::get('visa-cases/{vp_case}', [VisaProcessingCaseController::class, 'show'])->name('admin.visa-cases.show');
+        Route::post('visa-cases/{vp_case}/cancel', [VisaProcessingCaseController::class, 'cancel'])->name('admin.visa-cases.cancel');
+        Route::get('visa-cases/{vp_case}/file/{fileId}', [VisaProcessingCaseController::class, 'downloadFile'])->name('admin.visa-cases.file');
+
+        Route::get('nominated-batches', [AdminNominatedWorkerController::class, 'indexBatches'])->name('admin.nominated-batches.index');
+        Route::get('nominated-batches/{batch}', [AdminNominatedWorkerController::class, 'showBatch'])->name('admin.nominated-batches.show');
+        Route::post('nominated-batches/{batch}/approve', [AdminNominatedWorkerController::class, 'approveBatch'])->name('admin.nominated-batches.approve');
+        Route::post('nominated-batches/{batch}/return', [AdminNominatedWorkerController::class, 'returnBatch'])->name('admin.nominated-batches.return');
+        Route::get('nominated-workers', [AdminNominatedWorkerController::class, 'index'])->name('admin.nominated-workers.index');
+        Route::get('nominated-workers/{worker}', [AdminNominatedWorkerController::class, 'show'])->name('admin.nominated-workers.show');
+        Route::post('nominated-workers/documents/{document}/rematch', [AdminNominatedWorkerController::class, 'rematch'])->name('admin.nominated-workers.rematch');
+        Route::post('nominated-workers/documents/{document}/confirm', [AdminNominatedWorkerController::class, 'confirmMatch'])->name('admin.nominated-workers.confirm');
         Route::get('applied/jobs/{applied_job}', [JobController::class, 'appliedJobsShow'])->name('applied.job.show');
         Route::post('/job/bulk/import', [JobController::class, 'bulkImport'])->name('admin.job.bulk.import');
         Route::put('job/change/status/{job}', [JobController::class, 'jobStatusChange'])->name('admin.job.status.change');
@@ -162,6 +270,9 @@ Route::prefix('admin')->group(function () {
         Route::get('applyJob', [JobController::class, 'applyJob'])->name('job.applyJob');
         Route::post('save-job', [JobController::class, 'saveJob'])->name('save.job');
         Route::get('my-job', [JobController::class, 'myJob'])->name('my.job');
+        Route::get('/job/{job}/featured',[JobController::class, 'makeFeatured'])->name('job.featured');
+        Route::get('/job/{job}/highlight',[JobController::class, 'makeHighlight'])->name('job.highlight');
+        Route::post('/jobs/store',[JobController::class, 'store'])->middleware('feature:active_job_posting_limit');
 
 
 
@@ -210,11 +321,66 @@ Route::prefix('admin')->group(function () {
         //  job type route resource
         Route::resource('jobType', JobTypeController::class)->except('show', 'create');
         //  job type route resource
+        
+       
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/ai-dashboard',[\App\Http\Controllers\Admin\AIDashboardController::class,'index'])->name('admin.ai.dashboard');
+    Route::get('/live-chat',[\App\Http\Controllers\Admin\LiveChatController::class,'index'] );
+    Route::get('/live-chat/{id}',[\App\Http\Controllers\Admin\LiveChatController::class,'show']);
+    Route::post('/live-chat/{id}/reply',[\App\Http\Controllers\Admin\LiveChatController::class,'reply']);
+    Route::get('/ai-recruiter-dashboard', [\App\Http\Controllers\Admin\AIRecruiterDashboardController::class,'index'])->name('admin.ai.recruiter.dashboard');
+    Route::get('/ai-copilot',[CopilotController::class,'index'])->name('admin.ai.copilot');
+    Route::post('/ai-copilot/search',[CopilotController::class,'search'])->name('admin.ai.copilot.search');
+     Route::get('/analytics', [AnalyticsController::class,'index'])->name('admin.analytics');
+    Route::get('/ai-settings',[AISettingsController::class,'index'])->name('admin.ai.settings');
+    Route::post('/ai-settings/update',[AISettingsController::class,'update'])->name('admin.ai.settings.update');
+    Route::get('/ai-knowledge',[AIKnowledgeController::class,'index'])->name('admin.ai.knowledge.index');
+Route::get('/ai-knowledge/create',[AIKnowledgeController::class,'create'])->name('admin.ai.knowledge.create');
+Route::post('/ai-knowledge/store',[AIKnowledgeController::class,'store'])->name('admin.ai.knowledge.store');
+Route::get('/ai-knowledge/{id}/show', [AIKnowledgeController::class,'show'])->name('admin.ai.knowledge.show');
+Route::get('/ai-knowledge/{id}/edit',[AIKnowledgeController::class,'edit'])->name('admin.ai.knowledge.edit');
+Route::post('/ai-knowledge/{id}/update',[AIKnowledgeController::class,'update'])->name('admin.ai.knowledge.update');
+Route::delete('/ai-knowledge/{id}/delete',[AIKnowledgeController::class,'destroy'])->name('admin.ai.knowledge.destroy');
+
+Route::get('/ai-chat',[AIChatController::class,'index'])->name('admin.ai.chat.index');
+Route::get('/ai-chat/{session}',[AIChatController::class,'show'])->name('admin.ai.chat.show');
+Route::get('/ai-handover',[AIHandoverController::class,'index'])->name('admin.ai.handover.index');
+Route::post('/ai-handover/{id}/reply',[AIHandoverController::class,'reply'])->name('admin.ai.handover.reply');
+Route::get('/ai-notifications',[AINotificationController::class,'index'])->name('admin.ai.notifications.index');
+Route::post('/ai-chat/{session}/reply',[AIChatController::class,'reply'])->name('admin.ai.chat.reply');
+
+Route::get('/whatsapp-chat',[WhatsAppChatController::class,'index'])->name('admin.whatsapp.chat');
+Route::get('/whatsapp-chat/{phone}',[WhatsAppChatController::class,'show'])->name('admin.whatsapp.chat.show');
+Route::post('/whatsapp-chat/{phone}/reply',[WhatsAppChatController::class,'reply'])->name('admin.whatsapp.chat.reply');
+Route::post('/whatsapp-chat/{phone}/human-mode',[WhatsAppChatController::class,'human.mode'])->name('admin.whatsapp.chat.human.mode');
+Route::get('/admin/whatsapp-chat/{phone}/messages',[WhatsAppChatController::class,'messages'])->name('admin.whatsapp.chat.messages');
 
 
+});
 
 
+Route::middleware(['auth'])->group(function () {
 
+        Route::get('/chat-leads', [ChatLeadController::class, 'index'])->name('admin.chatleads.index');
+        Route::post('/chat-leads/{id}/update',[ChatLeadController::class, 'update'])->name('admin.chatleads.update');
+        Route::get('/chat-leads-export',[ChatLeadController::class, 'export'])->name('admin.chatleads.export');
+        Route::get('/chat-leads',[ChatLeadController::class, 'index'])->name('admin.chatleads.index');
+        Route::delete('/chat-leads/{id}',[ChatLeadController::class, 'destroy'])->name('admin.chatleads.destroy');
+        
+});
+    
+    Route::middleware(['auth'])->group(function () {
+    Route::get('/job-ai', [JobAiTemplateController::class, 'index'])->name('admin.job_ai.index');
+    Route::get('/job-ai/create', [JobAiTemplateController::class, 'create'])->name('admin.job_ai.create');
+    Route::post('/job-ai/store', [JobAiTemplateController::class, 'store'])->name('admin.job_ai.store');
+    Route::get('/job-ai/edit/{id}', [JobAiTemplateController::class, 'edit'])->name('admin.job_ai.edit');
+    Route::post('/job-ai/update/{id}', [JobAiTemplateController::class, 'update'])->name('admin.job_ai.update');
+    Route::delete('/job-ai/delete/{id}', [JobAiTemplateController::class, 'destroy'])->name('admin.job_ai.delete');
+
+
+});
+    
 
         // tags route resource
         Route::resource('tags', TagController::class);
@@ -227,20 +393,22 @@ Route::prefix('admin')->group(function () {
         Route::post('settings/menu-settings/sort', [MenuController::class, 'sortAble'])->name('menu-setting.sort-able');
 
         // About Page
-        Route::controller(CmsController::class)->group(function () {
-            Route::get('settings/delete/about/logo/{name}', 'aboutLogoDelete')->name('settings.aboutLogo.delete');
-            Route::get('settings/delete/payment/logo/{name}', 'paymentLogoDelete')->name('settings.paymentLogo.delete');
-            Route::put('settings/about', 'aboutupdate')->name('settings.aboutupdate');
-            Route::put('settings/payments', 'paymentupdate')->name('settings.paymentupdate');
-            Route::put('settings/others', 'othersupdate')->name('settings.others.update');
-            Route::put('settings/home', 'home')->name('settings.home.update');
-            Route::put('settings/auth', 'auth')->name('settings.auth.update');
-            Route::put('settings/faq', 'faq')->name('settings.faq.update');
-            Route::put('settings/errorpages', 'updateErrorPages')->name('settings.errorpage.update');
-            Route::put('settings/comingsoon', 'comingsoon')->name('settings.comingsoon.update');
-            Route::put('settings/account/complete/update', 'accountCompleteUpdate')->name('settings.account.complate.update');
-            Route::put('settings/maintenance/mode/update', 'maintenanceModeUpdate')->name('settings.maintenance.mode.update');
-        });
+        Route::prefix('about')->name('admin.about.')->middleware(['web', 'auth:admin'])->group(function () {
+        Route::get('/', [AdminAboutController::class, 'dashboard'])->name('dashboard');
+        Route::post('/hero',[AdminAboutController::class, 'updateHero'])->name('hero.update');
+        Route::post('/story',[AdminAboutController::class, 'updateStory'])->name('story.update');
+        Route::post('/features',[AdminAboutController::class, 'storeFeature'])->name('features.store');
+        Route::put('/features/{id}',[AdminAboutController::class, 'updateFeature'])->name('features.update');
+        Route::delete('/features/{id}',[AdminAboutController::class, 'deleteFeature'])->name('features.destroy');
+        Route::post('/metrics',[AdminAboutController::class, 'updateMetrics'])->name('metrics.update');
+        Route::put('/industries/{id}',[AdminAboutController::class, 'updateIndustry'])->name('industries.update');
+        Route::post('/ceo',[AdminAboutController::class, 'updateCeo'])->name('ceo.update');
+        Route::post('/videos', [AdminAboutController::class, 'storeVideo'])->name('videos.store');
+        Route::delete('/videos/{id}',[AdminAboutController::class, 'deleteVideo'])->name('videos.destroy');
+        Route::post('/social',[AdminAboutController::class, 'updateSocial'])->name('social.update');
+        Route::post('/config',[AdminAboutController::class, 'updateConfig'])->name('config.update');
+        Route::post('/cache/clear',[AdminAboutController::class, 'clearCacheManual'])->name('cache.clear');
+});
 
         //Dashboard Route
         Route::controller(AdminController::class)->group(function () {
@@ -270,6 +438,21 @@ Route::prefix('admin')->group(function () {
 
         // Website Setting Route
         Route::put('settings/terms/conditions/update', [CmsController::class, 'termsConditionsUpdate'])->name('admin.privacy.terms.update');
+        Route::controller(CmsController::class)
+            ->prefix('settings')
+            ->name('settings.')
+            ->group(function () {
+                Route::put('home/{cms}', 'home')->name('home.update');
+                Route::put('aboutupdate', 'aboutupdate')->name('aboutupdate');
+                Route::get('about-logo/delete/{name}', 'aboutLogoDelete')->name('aboutLogo.delete');
+                Route::put('auth/{cms}', 'auth')->name('auth.update');
+                Route::put('errorpage/{cms}', 'updateErrorPages')->name('errorpage.update');
+                Route::put('comingsoon/{cms}', 'comingsoon')->name('comingsoon.update');
+                Route::put('maintenance/mode', 'maintenanceModeUpdate')->name('maintenance.mode.update');
+                Route::put('paymentupdate', 'paymentupdate')->name('paymentupdate');
+                Route::get('payment-logo/delete/{name}', 'paymentLogoDelete')->name('paymentLogo.delete');
+                Route::put('others', 'othersupdate')->name('others.update');
+            });
         Route::controller(WebsiteSettingController::class)
             ->prefix('settings')
             ->name('settings.')
@@ -434,6 +617,39 @@ Route::prefix('admin')->group(function () {
             Route::delete('/delete/{id}', 'destroy')->name('destroy');
         });
     });
+    Route::get('agent/{id}/candidates', 
+    [App\Http\Controllers\Admin\AgentController::class, 'candidates']
+)->name('agent.candidates');
+
+    Route::name('admin.')->group(function () {
+
+    Route::get('agents', [AgentController::class, 'index'])->name('agents.index');
+    Route::get('agents/{id}', [AgentController::class, 'show'])->name('agents.show');
+    Route::get('agents/{id}/candidates', [AgentController::class, 'candidates'])->name('agents.candidates');
+    Route::post('agents/{id}/status', [AgentController::class, 'status'])->name('agents.status');
+    
+    Route::get('/hr-templates', [ContractTemplateController::class, 'index'])->name('hrtemplates.index');
+    Route::get('/hr-templates/create', [ContractTemplateController::class, 'create'])->name('hrtemplates.create');
+    Route::post('/hr-templates/store', [ContractTemplateController::class, 'store'])->name('hrtemplates.store');
+    Route::get('/hr-templates/edit/{id}', [ContractTemplateController::class, 'edit'])->name('hrtemplates.edit');
+    Route::post('/hr-templates/update/{id}', [ContractTemplateController::class, 'update'])->name('hrtemplates.update');
+    Route::delete('/hr-templates/delete/{id}', [ContractTemplateController::class, 'destroy'])->name('hrtemplates.delete');
+    // Footer manager screen
+    Route::get('footer', [FooterPanelController::class, 'index'])->name('footer.index');
+// Panels
+    Route::post('footer/panels', [FooterPanelController::class, 'store'])->name('footer.panels.store');
+    Route::put('footer/panels/{panel}', [FooterPanelController::class, 'update'])->name('footer.panels.update');
+    Route::delete('footer/panels/{panel}', [FooterPanelController::class, 'destroy'])->name('footer.panels.destroy');
+    Route::post('footer/panels/reorder', [FooterPanelController::class, 'reorder'])->name('footer.panels.reorder');
+// Items
+    Route::post('footer/items', [FooterItemController::class, 'store'])->name('footer.items.store');
+    Route::put('footer/items/{item}', [FooterItemController::class, 'update'])->name('footer.items.update');
+     Route::delete('footer/items/{item}', [FooterItemController::class, 'destroy'])->name('footer.items.destroy');
+    Route::post('footer/items/reorder', [FooterItemController::class, 'reorder'])->name('footer.items.reorder');
+    
+    
+
+            });
     Route::middleware(['auth:admin', 'otp.verified'])->group(function () {
         Route::controller(ProfileController::class)->group(function () {
             Route::get('/profile/settings', 'setting')->name('profile.setting');
@@ -444,8 +660,6 @@ Route::prefix('admin')->group(function () {
             Route::get('download-agreement', [AgentController::class, 'downloadAgreement'])->name('download.agreement');
             Route::post('save-agreement', [AgentController::class, 'saveAgreement'])->name('save.agreement');
             Route::post('approve-contract/{id}', [AgentController::class, 'approvedContract'])->name('approved.contract');
-            Route::post('/agent/toggle-profile-status', [AgentController::class, 'toggleProfileStatus'])->name('agent.toggleProfileStatus');
-            Route::post('/agent/change-role', [AgentController::class, 'changeRole'])->name('agent.change-role');
         });
     });
 });

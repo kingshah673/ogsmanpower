@@ -1,346 +1,228 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body {
-            font-family: 'DejaVu Sans', sans-serif;
-            /* PDF-supported font */
-            margin: 0;
-            padding: 0px;
-            background-color: #f8f8f8;
-        }
+<meta charset="UTF-8">
+<style>
+@page { size: A4 portrait; margin: {{ !empty($compactPdf) ? '6mm' : '10mm' }}; }
+body {
+    font-family: DejaVu Sans, sans-serif;
+    font-size: {{ !empty($compactPdf) ? '9px' : '12px' }};
+    line-height: 1.3;
+}
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 10px;
-            /* box-shadow: 0 0 5px rgba(0, 0, 0, 0.1); */
-            border-radius: 5px;
-            border: 2px solid #003366;
+.container {
+    border: 2px solid #000;
+    padding: 5px;
+}
 
-        }
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
 
-        .header table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+td {
+    border: 1px solid #000;
+    padding: 4px;
+    vertical-align: top;
+}
 
-        .header .logo,
-        .header .qr-code {
-            width: 80px;
-            height: auto;
-        }
+.title {
+    background: #e6f0fa;
+    font-weight: bold;
+    color: #0b5394;
+}
 
-        .header .logo {
-            vertical-align: top;
-        }
+.label {
+    width: 40%;
+    font-weight: bold;
+}
 
-        .header .qr-code {
-            vertical-align: top;
-            text-align: right;
-        }
+.value {
+    width: 60%;
+}
 
-        .section {
-            margin-bottom: 10px;
-        }
+.highlight {
+    background: yellow;
+    font-weight: bold;
+}
 
-        h3 {
-            border-bottom: 2px solid #003366;
-            padding-bottom: 5px;
-            color: #003366;
-            margin-top: 15px;
-            font-size: 16px;
-        }
+.red {
+    color: red;
+}
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 10px;
-        }
+img.photo {
+    width: 90px;
+    height: 110px;
+}
 
-        th,
-        td {
-            border: 1px solid #ddd;
-            padding: 0px;
-            text-align: left;
-            font-size: 12px;
-        }
-
-        .profile-image {
-            width: 100px;
-            height: auto;
-            border-radius: 50%;
-            border: 2px solid #003366;
-            margin: 10px auto;
-            display: block;
-        }
-
-        .footer {
-            margin-top: 10px;
-            text-align: center;
-        }
-
-        p {
-            font-size: 11px;
-        }
-
-        /* @media print {
-            body {
-                padding: 5px;
-            }
-
-            .container {
-                max-width: 100%;
-                box-shadow: none;
-                padding: 10px;
-            }
-        } */
-    </style>
+img.full {
+    width: 100%;
+    height: 300px;
+    object-fit: contain;
+}
+</style>
 </head>
 
 <body>
-    <div class="container">
-        <!-- Header Section -->
-        <div class="header">
-            <table>
-                <tr>
-                    <td style="width: 80px;">
-                        {{-- <img src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path($setting->favicon_image_url))) }}" alt="Company Logo" class="logo"> --}}
-                        {{-- <img src="{{ asset($setting->favicon_image_url) }}" alt="Company Logo" class="logo"> --}}
 
-                    </td>
-                    <td style="text-align: center;">
-                        <h1 style="margin: 0; font-size: 30px; color: #003366;">OGS MANPOWER</h1>
-                        <p style="margin: 0; font-size: 12px;">OGS Manpower Lic No. 2978 Pakistan</p>
-                    </td>
-                    <td style="width: 80px; text-align: right;">
-                        {{-- {!! $qrCode !!} --}}
-                        {{-- <img src="data:image/png;base64, {!! $qrCode !!}" alt="QR Code"> --}}
-                    </td>
-                </tr>
-            </table>
-        </div>
+<div class="container">
 
-        <!-- User Image & Applied For Sections Side by Side -->
-        <div class="section">
-            <h3>APPLIED FOR PRIVATE DRIVER</h3>
-            <table style="width: 100%;">
-                <tr>
-                    <!-- Left Side: User Image -->
-                    <td style="text-align: center;">
-                        @if ($candidate->photo)
-                            {{-- <img src="{{ asset($candidate->photo) }}" alt="User Image" class="profile-image"
-                                style="display: block; margin: 0 auto;"> --}}
-                        @endif
-                    </td>
+<table>
+<tr>
 
+<!-- ================= LEFT COLUMN ================= -->
+<td width="65%">
 
-                    <!-- Right Side: Expected Location and Salary -->
-                    <td style="width: 75%; vertical-align: top;">
-                        <table style="width: 100%;">
-                            <tr>
-                                <th style="text-align: left;">Expected Location</th>
-                                <td>{{ $candidate->expected_country->name ?? '' }}</td>
+    <!-- HEADER -->
+    <table>
+        <tr>
+            <td rowspan="3" width="100" align="center">
+                @if(!empty($candidate->photo))
+                    <img src="{{ resumeImageSrc($candidate->photo) }}" class="photo">
+                @else
+                    N/A
+                @endif
+            </td>
 
-                            </tr>
-                            <tr>
-                                <th style="text-align: left;">Expected Salary</th>
-                                <td>{{ $candidate->expected_salary }}</td>
-                            </tr>
-                        </table>
-                        {!! $candidate->bio !!}
+            <td class="label">Last Name</td>
+            <td class="label">First Name</td>
+            <td class="label">Middle Name</td>
+        </tr>
 
-                    </td>
-                </tr>
-            </table>
-        </div>
+        <tr>
+            <td>{{ $candidate->user->last_name ?? 'N/A' }}</td>
+            <td>{{ $candidate->user->first_name ?? 'N/A' }}</td>
+            <td>{{ $candidate->user->middle_name ?? 'N/A' }}</td>
+        </tr>
 
-        <!-- Personal Information & Passport Details -->
-        <div class="section">
-            <table style="width: 100%;">
-                <tr>
-                    <!-- Personal Information Section -->
-                    <td style="width: 35%; vertical-align: top;">
-                        <h3>Personal Information</h3>
-                        <table style="width: 100%;">
-                            <tr>
-                                <th>Full Name</th>
-                                <td>{{ $candidate->user->name }}</td>
-                            </tr>
-                            <tr>
-                                <th>Country</th>
-                                <td>{{ $candidate->country }}</td>
-                            </tr>
-                            <tr>
-                                <th>Date of Birth</th>
-                                <td>{{ $candidate->birth_date }}</td>
-                            </tr>
-                            <tr>
-                                <th>Age</th>
-                                <td>{{ \Carbon\Carbon::parse($candidate->birth_date)->age }}</td>
-                            </tr>
-                            <tr>
-                                <th>Address</th>
-                                <td>{{ $candidate->district . ', ' . $candidate->region }}</td>
+        <tr>
+            <td colspan="3">
+                Position:
+                <span class="highlight">
+                    {{ $candidate->position ?? 'N/A' }}
+                </span>
+            </td>
+        </tr>
 
-                            </tr>
-                            <tr>
-                                <th>Marital Status</th>
-                                <td>{{ $candidate->marital_status }}</td>
+        <tr>
+            <td></td>
+            <td colspan="3">Contract: {{ $candidate->contract ?? 'N/A' }}</td>
+        </tr>
 
-                            </tr>
-                        </table>
-                    </td>
+        <tr>
+            <td></td>
+            <td colspan="3">Asking Salary: {{ $candidate->expected_salary ?? 'N/A' }}</td>
+        </tr>
+    </table>
 
-                    <!-- Passport Section -->
-                    <td style="width: 35%; vertical-align: top;">
-                        <h3>Passport Details</h3>
-                        <table style="width: 100%;">
-                            <tr>
-                                <th>Passport Number</th>
-                                <td>{{ $candidate->passport_number }}</td>
-                            </tr>
-                            <tr>
-                                <th>Issue Date</th>
-                                <td>{{ $candidate->passport_issue_date }}</td>
-                            </tr>
-                            <tr>
-                                <th>Expiry Date</th>
-                                <td>{{ $candidate->passport_expiry_date }}</td>
-                            </tr>
-                            <tr>
-                                <th>Place of Issue</th>
-                                <td>{{ $candidate->place_of_issue }}</td>
-                            </tr>
-                            <tr>
-                                <th>CNIC Number</th>
-                                <td>{{ $candidate->cnic_number }}</td>
-                            </tr>
-                        </table>
-                    </td>
+    <!-- WORK EXPERIENCE -->
+    <table>
+        <tr><td colspan="2" class="title">Work Experience</td></tr>
 
-                    <!-- Education Section -->
-                    <td style="width: 30%; vertical-align: top;">
-                        <h3>Education</h3>
-                        <table style="width: 100%;">
-                            <tr>
-                                <th>Level</th>
-                                <th>Degree</th>
-                                <th>Year</th>
-                            </tr>
-                            @foreach ($candidate->educations as $education)
-                                <tr>
-                                    <td>{{ $education->level }}</td>
-                                    <td>{{ $education->degree }}</td>
-                                    <td>{{ $education->year }}</td>
-                                </tr>
-                            @endforeach
-                        </table>
-                    </td>
-                </tr>
-            </table>
-        </div>
+        <tr>
+            <td class="label">Position</td>
+            <td class="value">
+                {{ optional($candidate->experiences->first())->designation ?? 'N/A' }}
+            </td>
+        </tr>
 
-        <!-- Experience, Languages, and Skills Sections -->
-        <div class="section">
-            <table style="width: 100%;">
-                <tr>
-                    <!-- Experience Section -->
-                    <td style="width: 40%; vertical-align: top;">
-                        <h3>Experience</h3>
-                        <table style="width: 100%;">
-                            <tr>
-                                <th>Company</th>
-                                <th>Designation</th>
-                                <th>Period</th>
-                            </tr>
-                            @foreach ($candidate->experiences as $experience)
-                                <tr>
-                                    <td>{{ $experience->company }}</td>
-                                    <td>{{ $experience->designation }}</td>
-                                    <td>
-                                        {{ formatTime($experience->start, 'd M Y') }} -
-                                        {{ $experience->currently_working ? 'Currently Working' : formatTime($experience->end, 'd M Y') }}
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </table>
-                    </td>
+        <tr>
+            <td class="label">Location</td>
+            <td class="value red">
+                {{ optional($candidate->experiences->first())->location ?? 'N/A' }}
+            </td>
+        </tr>
+    </table>
 
-                    <!-- Languages Section -->
-                    <td style="width: 30%; vertical-align: top;">
-                        <h3>Languages</h3>
-                        <p>
-                            @if ($candidate->languages && $candidate->languages->count() > 0)
-                                {{ $candidate->languages->pluck('name')->implode(', ') }}
-                            @endif
-                        </p>
-                    </td>
+    <!-- PERSONAL INFO -->
+    <table>
+        <tr><td colspan="2" class="title">Personal Information</td></tr>
 
-                    <!-- Skills Section -->
-                    <td style="width: 30%; vertical-align: top;">
-                        <h3>Skills</h3>
-                        <p>
-                            @if ($candidate->skills && $candidate->skills->count() > 0)
-                                {{ $candidate->skills->pluck('name')->implode(', ') }}
-                            @endif
-                        </p>
-                    </td>
-                </tr>
-            </table>
-        </div>
+        <tr><td class="label">Nationality</td><td>{{ $candidate->country ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Religion</td><td>{{ $candidate->religion ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Age</td><td>{{ $candidate->birth_date ? \Carbon\Carbon::parse($candidate->birth_date)->age : 'N/A' }}</td></tr>
+        <tr><td class="label">Birthday</td><td>{{ $candidate->birth_date ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Birthplace</td><td>{{ $candidate->birth_place ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Civil Status</td><td>{{ $candidate->marital_status ?? 'N/A' }}</td></tr>
+        <tr><td class="label">No. of Kids</td><td>{{ $candidate->kids ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Height</td><td>{{ $candidate->height ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Weight</td><td>{{ $candidate->weight ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Education</td>
+            <td>{{ optional($candidate->education)->name ?? 'N/A' }}</td>
+        </tr>
+    </table>
 
-        <!-- Custom Attributes Section -->
-        @if ($candidate->attributes)
-            <div class="section">
-                <table style="width: 100%;">
-                    <tr>
-                        @foreach ($candidate->attributes as $at)
-                            <th>{{ $at->attribute_name }}</th>
-                        @endforeach
-                    </tr>
-                    <tr>
-                        @foreach ($candidate->attributes as $at)
-                            <td>{{ $at->attribute_value }}</td>
-                        @endforeach
-                    </tr>
-                </table>
-            </div>
+    <!-- CONTACT -->
+    <table>
+        <tr><td class="label">Contacts</td><td class="red">{{ $candidate->user->phone ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Messenger</td><td>{{ $candidate->messenger ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Whatsapp</td><td>{{ $candidate->whatsapp ?? 'N/A' }}</td></tr>
+    </table>
+
+    <!-- SKILLS -->
+    <table>
+        <tr><td colspan="2" class="title">Skills Checklist</td></tr>
+
+        <tr><td class="label">Communication</td><td>{{ $candidate->communication ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Arabic</td><td>{{ $candidate->arabic ?? 'N/A' }}</td></tr>
+        <tr><td class="label">English</td><td>{{ $candidate->english ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Cleaning</td><td>{{ $candidate->cleaning ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Child Care</td><td>{{ $candidate->child_care ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Laundry</td><td>{{ $candidate->laundry ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Ironing</td><td>{{ $candidate->ironing ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Cooking</td><td>{{ $candidate->cooking ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Caregiving</td><td>{{ $candidate->caregiving ?? 'N/A' }}</td></tr>
+    </table>
+
+</td>
+
+<!-- ================= RIGHT COLUMN ================= -->
+<td width="35%">
+
+    <!-- FULL IMAGE -->
+    <div style="text-align:center;">
+        @if(!empty($candidate->full_image))
+            <img src="{{ resumeImageSrc($candidate->full_image) }}" class="full">
+        @else
+            N/A
         @endif
-
-        <div class="section">
-            <table style="width: 100%;">
-                <h3>Attachments</h3>
-
-                <tr>
-                    <td style="width: 50%; vertical-align: top;">
-                        @if ($attachments && $attachments->license_image)
-                            {{-- <img src="{{ asset('storage/candidates/' . $attachments->license_image) }}" alt="License"
-                                style="width: 200px; height: 125px; margin-right: 20px;"> --}}
-                        @endif
-                    </td>
-                    <td style="width: 50%; vertical-align: top; text-align: right;">
-                        @if ($attachments && $attachments->passport_image)
-                            {{-- <img src="{{ asset('storage/candidates/' . $attachments->passport_image) }}" alt="Passport"
-                                style="width: 200px; height: 125px;"> --}}
-                        @endif
-                    </td>
-                </tr>
-            </table>
-        </div>
-
-
-        <!-- Footer -->
-        <div class="footer">
-
-            <p>Worker Video: <a href="https://youtube.com/shorts/SaF_FaBuB12?feature=share">View Video</a></p>
-            <p>© OGS Manpower. All rights reserved.</p>
-        </div>
     </div>
-</body>
 
+    <!-- REMARKS -->
+    <table>
+        <tr><td class="title">Remarks</td></tr>
+        <tr>
+            <td style="font-size:11px;">
+                {{ $candidate->remarks ?? 'N/A' }}
+            </td>
+        </tr>
+    </table>
+
+    <!-- PASSPORT -->
+    <table>
+        <tr><td colspan="2" class="title">Passport Details</td></tr>
+
+        <tr><td class="label">Number</td><td>{{ $candidate->passport_number ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Date Issued</td><td>{{ $candidate->passport_issue_date ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Date Expired</td><td>{{ $candidate->passport_expiry_date ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Issued At</td><td>{{ $candidate->place_of_issue ?? 'N/A' }}</td></tr>
+    </table>
+
+    <!-- ADDRESS -->
+    <table>
+        <tr><td colspan="2" class="title">Address and Next Kin</td></tr>
+
+        <tr><td class="label">Address</td><td>{{ $candidate->address ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Next Kin</td><td>{{ $candidate->next_kin ?? 'N/A' }}</td></tr>
+        <tr><td class="label">Mobile</td><td>{{ $candidate->kin_mobile ?? 'N/A' }}</td></tr>
+    </table>
+
+</td>
+
+</tr>
+</table>
+
+</div>
+
+</body>
 </html>

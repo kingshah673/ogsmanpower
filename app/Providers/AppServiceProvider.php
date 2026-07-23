@@ -18,6 +18,10 @@ use Modules\Language\Entities\Language;
 use Modules\Location\Entities\Country;
 use Modules\SetupGuide\Entities\SetupGuide;
 use Illuminate\Support\Facades\View;
+use App\Models\FooterPanel;
+use App\Services\Admin\AdminSidebarKpiService;
+
+
 class AppServiceProvider extends ServiceProvider
 {
     use GetMenuTrait;
@@ -29,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+        $this->app->singleton(\App\Services\AI\BilingualResumeTranslator::class);
     }
 
     /**
@@ -39,9 +43,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        // if($this->app->environment('production')) {
-        // \URL::forceScheme('https');
-        // }
+        $appUrl = (string) config('app.url', 'http://127.0.0.1:8000');
+        \Illuminate\Support\Facades\URL::forceScheme(str_starts_with($appUrl, 'https://') ? 'https' : 'http');
+
+        if (! $this->app->runningInConsole() && request()->isSecure()) {
+            config(['session.secure' => true]);
+        }
+
         Paginator::useBootstrap();
 
         if (! app()->runningInConsole()) {
@@ -73,7 +81,9 @@ class AppServiceProvider extends ServiceProvider
                 return Currency::all();
             });
 
-            $pages = Page::all();
+            $pages = Cache::remember('custom_pages', $expirationTime, function () {
+                return Page::all();
+            });
 
             $cookies = Cache::remember('cookies_data', $expirationTime, function () {
                 return Cookies::first();
@@ -86,6 +96,29 @@ class AppServiceProvider extends ServiceProvider
             $setting = Cache::remember('setting_data', $expirationTime, function () {
                 return loadSetting();
             });
+            
+            View::composer('partials.footer', function ($view) {
+
+    $panels = Cache::rememberForever('footer_panels', function () {
+
+        return FooterPanel::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->with([
+                'items' => function ($q) {
+
+                    $q->where('is_active', true)
+                      ->orderBy('sort_order');
+
+                }
+            ])
+            ->get();
+
+    });
+
+    $view->with('footerPanels', $panels);
+
+});
 
             view()->share('defaultLanguage', $default_language);
             view()->share('cookies', $cookies);
@@ -107,6 +140,18 @@ class AppServiceProvider extends ServiceProvider
             view()->composer('frontend.partials.header', function ($view) {
                 $view->with('public_menu_lists', $this->publicMenu());
                 $view->with('company_menu_lists', $this->companyMenu());
+                $agencyMenu = [];
+                foreach ([
+                    ['title' => 'Dashboard', 'name' => 'agency.dashboard'],
+                    ['title' => 'My Jobs', 'name' => 'agency.myjob'],
+                    ['title' => 'Post Job', 'name' => 'agency.job.create'],
+                    ['title' => 'Settings', 'name' => 'agency.setting'],
+                ] as $item) {
+                    if (\Illuminate\Support\Facades\Route::has($item['name'])) {
+                        $agencyMenu[] = ['title' => $item['title'], 'url' => route($item['name'])];
+                    }
+                }
+                $view->with('agency_menu_lists', $agencyMenu);
                 $view->with('candidate_menu_lists', $this->candidateMenu());
             });
 
@@ -140,10 +185,29 @@ class AppServiceProvider extends ServiceProvider
         });
         
         View::composer('*', function ($view) {
-            $user = auth()->user();
-            $candidate = $user ? $user->candidate : null;
+            if (request()->routeIs('candidate.viewResume', 'admin.viewResume')) {
+                return;
+            }
+
+            // Guests / employers / agencies: skip expensive profile-completion work on every view
+            if (! auth('user')->check() || authUser()->role !== 'candidate') {
+                $view->with('completionPercentage', 0);
+                $view->with('profileCompletionMissing', []);
+
+                return;
+            }
+
+            $candidate = authUser()->candidate;
             $completionPercentage = $candidate ? $candidate->calculateProfileCompletion() : 0;
+            $profileCompletionMissing = ($candidate && $completionPercentage < 100)
+                ? $candidate->profileCompletionMissing()
+                : [];
             $view->with('completionPercentage', $completionPercentage);
+            $view->with('profileCompletionMissing', $profileCompletionMissing);
+        });
+
+        View::composer('backend.layouts.partials.default-sidebar', function ($view) {
+            $view->with('kpi', app(AdminSidebarKpiService::class)->counts());
         });
     }
 }

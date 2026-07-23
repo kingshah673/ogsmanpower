@@ -27,34 +27,55 @@ class FreePlanPurchaseController extends Controller
      *
      * @return void
      */
-    public function purchaseFreePlan(Request $request)
-    {
-        $plan = Plan::findOrFail($request->plan);
-        if ($plan->price == 0) {
+   public function purchaseFreePlan(Request $request)
+{
+    $plan = Plan::findOrFail($request->plan);
 
-            $user = auth()->user();
-            $company = $user->company;
+    if ($plan->price != 0) {
+        flashWarning(__('its_not_a_free_plan'));
+        return back();
+    }
 
-            // check free plan already buy
-            $already_purchase = $this->checkAlreadyPurchase($plan, $company);
-            if ($already_purchase) {
-                flashWarning(__('plan_already_purchased'));
+    $user = auth()->user();
 
-                return redirect()->back();
-            }
+    // ✅ AGENCY FLOW
+    if ($user->role == 'agency') {
 
-            $this->createPlan($plan, $company);
-            $this->makeTransaction($plan);
+        $agency = $user->agency;
 
-            flashSuccess(__('plan_successfully_purchased'));
-
-            return redirect()->route('company.plan');
-        } else {
-            flashWarning(__('its_not_a_free_plan'));
-
+        $already_purchase = $this->checkAlreadyAgencyPurchase($plan, $agency);
+        if ($already_purchase) {
+            flashWarning(__('plan_already_purchased'));
             return back();
         }
+
+        $this->createAgencyPlan($plan, $agency); // 👈 separate function
+        $this->makeTransaction($plan);
+
+        flashSuccess(__('plan_successfully_purchased'));
+
+        return redirect()->route('agency.dashboard');
     }
+
+    // ✅ COMPANY FLOW
+    else {
+
+        $company = $user->company;
+
+        $already_purchase = $this->checkAlreadyPurchase($plan, $company);
+        if ($already_purchase) {
+            flashWarning(__('plan_already_purchased'));
+            return back();
+        }
+
+        $this->createPlan($plan, $company);
+        $this->makeTransaction($plan);
+
+        flashSuccess(__('plan_successfully_purchased'));
+
+        return redirect()->route('company.dashboard');
+    }
+}
 
     public function purchaseZeroPricing($payperjob_code)
     {
@@ -74,57 +95,116 @@ class FreePlanPurchaseController extends Controller
 
         return redirect()->route('website.job.details', $jobCreated->slug);
     }
-
+    
     public function createPlan($plan, $company)
-    {
-        $user_plan = UserPlan::where('company_id', $company->id)->first();
+{
+    $user_plan = UserPlan::where('company_id', $company->id)->first();
 
-        if ($user_plan) {
+    if ($user_plan) {
 
-            $user_plan->update([
-                'plan_id' => $plan->id,
-                'job_limit' => $user_plan->job_limit + $plan->job_limit,
-                'featured_job_limit' => $user_plan->featured_job_limit + $plan->featured_job_limit,
-                'highlight_job_limit' => $user_plan->highlight_job_limit + $plan->highlight_job_limit,
-                'candidate_cv_view_limit' => $user_plan->candidate_cv_view_limit + $plan->candidate_cv_view_limit,
-                'candidate_cv_view_limitation' => $plan->candidate_cv_view_limitation,
-            ]);
-        } else {
-            $company->userPlan()->create([
-                'plan_id' => $plan->id,
-                'job_limit' => $plan->job_limit,
-                'featured_job_limit' => $plan->featured_job_limit,
-                'highlight_job_limit' => $plan->highlight_job_limit,
-                'candidate_cv_view_limit' => $plan->candidate_cv_view_limit,
-                'candidate_cv_view_limitation' => $plan->candidate_cv_view_limitation,
-            ]);
-        }
-    }
+        $user_plan->update([
+            'plan_id' => $plan->id,
+            'job_limit' => $user_plan->job_limit + $plan->job_limit,
+            'featured_job_limit' => $user_plan->featured_job_limit + $plan->featured_job_limit,
+            'highlight_job_limit' => $user_plan->highlight_job_limit + $plan->highlight_job_limit,
+            'candidate_cv_view_limit' => $user_plan->candidate_cv_view_limit + $plan->candidate_cv_view_limit,
+            'candidate_cv_view_limitation' => $plan->candidate_cv_view_limitation,
+        ]);
 
-    public function makeTransaction($plan = null, $amount = 0, $payment_type = 'subscription_based')
-    {
-        if (isset($plan) && isset($plan->price)) {
-            $amount = $plan->price;
-        }
+    } else {
 
-        $fromRate = Currency::whereCode(config('templatecookie.currency'))->first()->rate;
-        $toRate = Currency::whereCode('USD')->first()->rate;
-        $rate = $fromRate / $toRate;
+        // ❌ relation hatao
+        // $company->userPlan()->create()
 
-        return Earning::create([
-            'order_id' => uniqid(),
-            'transaction_id' => uniqid('tr_'),
-            'payment_provider' => 'offline',
-            'plan_id' => $plan?->id ?? null,
-            'company_id' => currentCompany()->id,
-            'amount' => $amount,
-            // 'currency_symbol' => config('jobpilot.currency_symbol'),
-            'currency_symbol' => config('templatecookie.currency_symbol'),
-            'usd_amount' => $amount * $rate,
-            'payment_type' => $payment_type,
-            'payment_status' => 'paid',
+        // ✅ direct create karo
+        UserPlan::create([
+            'plan_id' => $plan->id,
+
+            // ✅ FIX
+            'company_id' => $company->id,
+            'agency_id' => null,
+
+            'job_limit' => $plan->job_limit,
+            'featured_job_limit' => $plan->featured_job_limit,
+            'highlight_job_limit' => $plan->highlight_job_limit,
+            'candidate_cv_view_limit' => $plan->candidate_cv_view_limit,
+            'candidate_cv_view_limitation' => $plan->candidate_cv_view_limitation,
         ]);
     }
+}
+    public function createAgencyPlan($plan, $agency)
+{
+    $user_plan = UserPlan::where('agency_id', $agency->id)->first();
+
+    if ($user_plan) {
+
+        $user_plan->update([
+            'plan_id' => $plan->id,
+            'job_limit' => $user_plan->job_limit + $plan->job_limit,
+            'featured_job_limit' => $user_plan->featured_job_limit + $plan->featured_job_limit,
+            'highlight_job_limit' => $user_plan->highlight_job_limit + $plan->highlight_job_limit,
+            'candidate_cv_view_limit' => $user_plan->candidate_cv_view_limit + $plan->candidate_cv_view_limit,
+            'candidate_cv_view_limitation' => $plan->candidate_cv_view_limitation,
+        ]);
+
+    } else {
+
+        UserPlan::create([
+            'plan_id' => $plan->id,
+
+            // ✅ IMPORTANT FIX
+            'agency_id' => $agency->id,
+            'company_id' => null,
+
+            'job_limit' => $plan->job_limit,
+            'featured_job_limit' => $plan->featured_job_limit,
+            'highlight_job_limit' => $plan->highlight_job_limit,
+            'candidate_cv_view_limit' => $plan->candidate_cv_view_limit,
+            'candidate_cv_view_limitation' => $plan->candidate_cv_view_limitation,
+        ]);
+    }
+}
+
+    public function makeTransaction($plan = null, $amount = 0, $payment_type = 'subscription_based')
+{
+    if (isset($plan) && isset($plan->price)) {
+        $amount = $plan->price;
+    }
+
+    $fromRate = Currency::whereCode(config('templatecookie.currency'))->first()->rate;
+    $toRate = Currency::whereCode('USD')->first()->rate;
+    $rate = $fromRate / $toRate;
+
+    $user = auth()->user();
+
+    // ✅ Default null
+    $company_id = null;
+    $agency_id = null;
+
+    // ✅ Role based assignment
+    if ($user->role == 'agency') {
+        $agency_id = $user->agency->id ?? null;
+    } else {
+        $company_id = $user->company->id ?? null;
+    }
+
+    return Earning::create([
+        'order_id' => uniqid(),
+        'transaction_id' => uniqid('tr_'),
+        'payment_provider' => 'offline',
+        'plan_id' => $plan?->id ?? null,
+
+        // ✅ FIXED
+        'company_id' => $company_id,
+        'agency_id' => $agency_id,
+
+        'amount' => $amount,
+        'currency_symbol' => config('templatecookie.currency_symbol'),
+        'usd_amount' => $amount * $rate,
+        'payment_type' => $payment_type,
+        'payment_status' => 'paid',
+    ]);
+}
 
     public function checkAlreadyPurchase(object $plan, object $company): bool
     {
@@ -135,4 +215,14 @@ class FreePlanPurchaseController extends Controller
             return false;
         }
     }
+   public function checkAlreadyAgencyPurchase(object $plan, object $agency): bool
+{
+    $order = Earning::where('agency_id', $agency->id)->where('plan_id', $plan->id)->where('amount', 0)->first();
+    
+if ($order) {
+            return true;
+        } else {
+            return false;
+        }
+}
 }

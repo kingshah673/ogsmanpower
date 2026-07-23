@@ -1,55 +1,21 @@
 @extends('backend.layouts.app')
 @section('title')
-    {{ __('Document Lists') }}
+    {{ __('verification_documents') }}
 @endsection
 @section('content')
     <div class="container-fluid">
         <div class="row">
             <div class="col-md-12">
                 <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title line-height-36">{{ __('Submitted Documents') }}
-
-                        </h3>
-
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3 class="card-title line-height-36 mb-0">{{ __('verification_documents') }} — {{ $company->user->name }}</h3>
+                        <a href="{{ route('company.show', $company->id) }}" class="btn btn-sm btn-outline-secondary">{{ __('back') }}</a>
                     </div>
-
-                    <div id="example1_wrapper" class="">
-
-                            <div class="col-md-12">
-                                @if(!$company->getFirstMedia('document'))
-                                    <h4  class="mt-5 mb-5 ml-2">Document Not Given</h4>
-                                @else
-
-                                        <div class="form-group col-8" style="margin-left: auto ; margin-right: auto">
-                                            <x-forms.label class="mt-4"  name="Image of your NID/Driving Lisence/Passport " :required="false"  />
-                                            <input name="document" type="file"
-                                                   data-show-errors="true" data-width="100%"
-
-                                                   data-default-file="{{ $company->getFirstMedia('document') ? $company->getFirstMedia('document')->getFullUrl() : ""  }}"
-                                                   {{ $company->getFirstMedia('document') ? "disabled='disabled'"  : '' }}
-                                                   class="dropify">
-                                            <form class="my-4" action="{{route('company.verify.documents.download',$company)}}" method="POST">
-                                                @csrf
-                                                <input type="hidden"  name="file_type" value="document">
-                                                <button class="btn btn-primary" type="submit">Download</button>
-                                            </form>
-                                            <label for="document_verify" style="display: flex">
-                                                Verified
-                                                <input id="document_verify"
-                                                       {{ $company->document_verified_at ? 'checked' : ''  }}
-
-                                                       type="checkbox" style="width: 24px ; height: 24px ; margin-left: 6px" >
-                                            </label>
-                                        </div>
-
-
-
-                                @endif
-                            </div>
-
-                            </div>
-
+                    <div class="card-body">
+                        @include('backend.company.partials.verification-documents-card', [
+                            'company' => $company,
+                            'allDocumentTypes' => $allDocumentTypes ?? \App\Services\Company\CompanyDocumentVerificationService::allActiveDocumentTypes(),
+                        ])
                     </div>
                 </div>
             </div>
@@ -57,98 +23,88 @@
     </div>
 @endsection
 
-
-@section('style')
-    <link rel="stylesheet" href="{{ asset('backend') }}/plugins/datatables-responsive/css/responsive.bootstrap4.min.css">
-
-    <style>
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 35px;
-            height: 19px;
-        }
-
-        /* Hide default HTML checkbox */
-        .switch input {
-            display: none;
-        }
-
-        /* The slider */
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            -webkit-transition: .4s;
-            transition: .4s;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 15px;
-            width: 15px;
-            left: 3px;
-            bottom: 2px;
-            background-color: white;
-            -webkit-transition: .4s;
-            transition: .4s;
-        }
-
-        input.success:checked+.slider {
-            background-color: #28a745;
-        }
-
-        input:checked+.slider:before {
-            -webkit-transform: translateX(15px);
-            -ms-transform: translateX(15px);
-            transform: translateX(15px);
-        }
-
-        /* Rounded sliders */
-        .slider.round {
-            border-radius: 34px;
-        }
-
-        .slider.round:before {
-            border-radius: 50%;
-        }
-    </style>
-@endsection
-
 @section('script')
-    <script src="{{ asset('backend') }}/plugins/bootstrap-switch/js/bootstrap-switch.min.js"></script>
-    <script src="{{ asset('backend') }}/plugins/dropify/js/dropify.min.js"></script>
+<script>
+    $('#document_verify_admin').on('change', function() {
+        $.ajax({
+            type: 'GET',
+            dataType: 'json',
+            url: '{{ route('admin.document.verify.change', $company) }}',
+            success: function(response) {
+                toastr.success(response.message, 'Success');
+                setTimeout(function () { window.location.reload(); }, 800);
+            },
+            error: function(xhr) {
+                const message = xhr.responseJSON?.message || '{{ __('something_went_wrong') }}';
+                toastr.error(message, 'Error');
+                window.location.reload();
+            }
+        });
+    });
 
-    <script>
-        $('.dropify').dropify();
-    </script>
-    <script>
-        $('#document_verify').on('change', function() {
-            var status = $(this).prop('checked') == true ? 1 : 0;
+    $('#requestResubmitForm').on('submit', function(e) {
+        e.preventDefault();
+        $.ajax({
+            type: 'POST',
+            dataType: 'json',
+            url: '{{ route('admin.company.documents.request_resubmit', $company) }}',
+            data: {
+                _token: '{{ csrf_token() }}',
+                document_review_note: $('#document_review_note').val()
+            },
+            success: function(response) {
+                toastr.success(response.message, 'Success');
+            },
+            error: function(xhr) {
+                const message = xhr.responseJSON?.message || '{{ __('something_went_wrong') }}';
+                toastr.error(message, 'Error');
+            }
+        });
+    });
+</script>
+<script>
+    function syncAssignmentFieldState() {
+        $('#companyDocumentAssignmentsForm .assignment-checkbox').each(function () {
+            const enabled = $(this).is(':checked');
+            const row = $(this).closest('.border.rounded.p-3');
+            row.find('.assignment-type-id').prop('disabled', !enabled);
+            row.find('.assignment-required').prop('disabled', !enabled);
+        });
+    }
 
-            var companyId = {{$company->id}};
+    syncAssignmentFieldState();
+    $(document).on('change', '.assignment-checkbox', syncAssignmentFieldState);
 
-            $.ajax({
-                type: "GET",
-                dataType: "json",
-                url: '{{ route('admin.document.verify.change',$company) }}',
-
-                success: function(response) {
-                    toastr.success(response.message, 'Success');
-                }
+    $('#companyDocumentAssignmentsForm').on('submit', function (e) {
+        e.preventDefault();
+        const assignments = [];
+        $('#companyDocumentAssignmentsForm .assignment-checkbox:checked').each(function () {
+            const typeId = $(this).data('type-id');
+            const row = $(this).closest('.border.rounded.p-3');
+            assignments.push({
+                document_type_id: typeId,
+                is_required: row.find('.assignment-required').is(':checked') ? 1 : 0,
+                sort_order: assignments.length + 1,
             });
-
-            {{--if (status == 1) {--}}
-            {{--    $(`#verification_status_${id}`).text("{{ __('verified') }}")--}}
-            {{--}else{--}}
-            {{--    $(`#verification_status_${id}`).text("{{ __('unverified') }}")--}}
-            {{--}--}}
         });
 
-    </script>
+        $.ajax({
+            type: 'POST',
+            dataType: 'json',
+            url: '{{ route('admin.company.documents.assignments', $company) }}',
+            data: {
+                _token: '{{ csrf_token() }}',
+                assignments: assignments,
+            },
+            success: function (response) {
+                toastr.success(response.message, 'Success');
+                setTimeout(function () { window.location.reload(); }, 700);
+            },
+            error: function (xhr) {
+                const message = xhr.responseJSON?.message || '{{ __('something_went_wrong') }}';
+                toastr.error(message, 'Error');
+            }
+        });
+    });
+</script>
 @endsection

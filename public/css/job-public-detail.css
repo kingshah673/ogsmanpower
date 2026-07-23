@@ -1,0 +1,292 @@
+/* Job detail page — matches company_profile_vue_js visual language */
+.cw-jd-page .cw-jd-prose {
+    color: #4b5563;
+    line-height: 1.75;
+    font-size: 0.9375rem;
+}
+
+.cw-jd-page .cw-jd-prose p:last-child {
+    margin-bottom: 0;
+}
+
+.cw-jd-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #dbeafe;
+}
+
+.cw-jd-tag--muted {
+    background: #f3f4f6;
+    color: #374151;
+    border-color: #e5e7eb;
+}
+
+.cw-jd-tag--green {
+    background: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0;
+}
+
+.cw-jd-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
+
+.cw-jd-apply-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    border-radius: 0.75rem;
+    border: none;
+    background: #020617;
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.cw-jd-apply-primary:hover {
+    background: #1e293b;
+    color: #fff;
+}
+
+.cw-jd-apply-primary:disabled,
+.cw-jd-apply-primary.is-disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.cw-jd-sidebar-cta {
+    position: sticky;
+    top: 5.5rem;
+}
+
+.cw-jd-company-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    color: inherit;
+    margin-bottom: 1rem;
+}
+
+.cw-jd-company-link:hover {
+    color: #0a65cc;
+}
+
+.cw-jd-company-logo {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+    object-fit: contain;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+}
+
+.cw-jd-alert {
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+/* Easy Apply modal */
+.cw-jd-modal .modal-content {
+    border: none;
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+.cw-jd-modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cw-jd-modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #111827;
+}
+
+.cw-jd-modal-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+.cw-jd-modal-body {
+    padding: 1.5rem;
+}
+
+.cw-jd-modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.cw-jd-profile-box {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #f9fafb;
+    margin-bottom: 1.25rem;
+}
+
+.cw-jd-profile-img {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.cw-jd-field {
+    margin-bottom: 1.25rem;
+}
+
+.cw-jd-field label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #111827;
+}
+
+.cw-jd-input,
+.cw-jd-textarea {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid #d1d5db;
+    padding: 0.75rem 1rem;
+    font-size: 0.9375rem;
+}
+
+.cw-jd-input:focus,
+.cw-jd-textarea:focus {
+    outline: none;
+    border-color: #0a65cc;
+    box-shadow: 0 0 0 3px rgba(10, 101, 204, 0.12);
+}
+
+.cw-jd-upload {
+    border: 2px dashed #cbd5e1;
+    border-radius: 0.875rem;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.cw-jd-upload.is-uploaded {
+    border-color: #12b76a;
+    background: #f0fdf4;
+}
+
+.cw-jd-upload-inner {
+    padding: 2rem 1.25rem;
+    text-align: center;
+}
+
+.cw-jd-upload-icon {
+    font-size: 2rem;
+    color: #0a65cc;
+    margin-bottom: 0.5rem;
+}
+
+.cw-jd-resume-success {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #ecfdf3;
+    color: #067647;
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.cw-jd-phone-input {
+    padding-left: 5.5rem !important;
+}
+
+.cw-jd-related {
+    display: block;
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    margin-bottom: 0.75rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cw-jd-related:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    color: inherit;
+}
+
+.cw-jd-resume-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.cw-jd-resume-option {
+    display: block;
+    margin: 0;
+    cursor: pointer;
+}
+
+.cw-jd-resume-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.cw-jd-resume-option-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #fff;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.cw-jd-resume-option-body strong {
+    display: block;
+    font-size: 0.9rem;
+    color: #111827;
+}
+
+.cw-jd-resume-option-body small {
+    display: block;
+    margin-top: 0.15rem;
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+.cw-jd-resume-option input:checked + .cw-jd-resume-option-body {
+    border-color: #2563eb;
+    background: #eff6ff;
+}

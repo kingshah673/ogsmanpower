@@ -41,6 +41,8 @@ class SettingSeeder extends Seeder
         $setting->default_long = 90.4112704917406;
         $setting->default_lat = 23.757853442382867;
         $setting->pwa_enable = true;
+        $setting->employer_auto_activation          = true;
+        $setting->candidate_account_auto_activation = true;
         $setting->save();
 
         // Payment Setting

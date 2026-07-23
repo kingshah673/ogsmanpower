@@ -18,19 +18,31 @@ class DynamicInputController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'label' => 'required|string|max:255',
-            'type' => 'required|string',
-            'required' => 'required|boolean',
-            'active' => 'required|boolean',
-            'candidate_id' => 'required|exists:candidates,id', // Ensure candidate ID is valid
+            'label'        => 'required|string|max:255',
+            'type'         => 'required|in:text,textarea,date,dropdown,file,email,number',
+            'required'     => 'required|in:0,1,true,false',
+            'active'       => 'required|in:0,1,true,false',
+            'candidate_id' => 'nullable|exists:candidates,id',
+            'section'      => 'nullable|string|max:64',
+            'options'      => 'nullable|string',
+            'sort_order'   => 'nullable|integer|min:0',
         ]);
 
+        $options = null;
+        if ($validated['type'] === 'dropdown' && ! empty($validated['options'])) {
+            $lines = array_filter(array_map('trim', explode("\n", $validated['options'])));
+            $options = json_encode(array_values($lines));
+        }
+
         $attribute = new CandidateAttribute();
-        $attribute->candidate_id = $validated['candidate_id']; // Associate with candidate
-        $attribute->attribute_name = $validated['label'];
-        $attribute->input_type = $validated['type'];
-        $attribute->is_required = $validated['required'];
-        $attribute->is_active = $validated['active'];
+        $attribute->candidate_id   = $validated['candidate_id'] ?? null;
+        $attribute->section          = $validated['section'] ?? 'basic-info';
+        $attribute->attribute_name   = $validated['label'];
+        $attribute->input_type       = $validated['type'];
+        $attribute->is_required      = filter_var($validated['required'], FILTER_VALIDATE_BOOLEAN);
+        $attribute->is_active        = filter_var($validated['active'], FILTER_VALIDATE_BOOLEAN);
+        $attribute->options          = $options;
+        $attribute->sort_order       = $validated['sort_order'] ?? 0;
         $attribute->save();
 
         // return response()->json(['success' => true, 'html' => $this->renderDynamicInput($attribute)]);
@@ -47,7 +59,13 @@ class DynamicInputController extends Controller
         $attribute = CandidateAttribute::find($id);
 
         if ($attribute) {
+            // Remove per-candidate values tied to a global definition.
+            if ($attribute->candidate_id === null) {
+                CandidateAttribute::where('definition_id', $attribute->id)->delete();
+            }
+
             $attribute->delete();
+
             return response()->json(['success' => true]);
         }
 

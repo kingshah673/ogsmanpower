@@ -15,7 +15,7 @@
                             <div class="left-text m-0">
                                 <h3 class="f-size-18 lh-1 m-0">
                                     {{ __('applied_jobs') }}
-                                    <span class="text-gray-400">({{ $appliedJobs->total() }})</span>
+                                    <span class="text-gray-400">({{ $jobs->total() }})</span>
                                 </h3>
                             </div>
                             <span class="sidebar-open-nav">
@@ -35,8 +35,8 @@
                                     </thead>
                                 </table> --}}
                                 <div>
-                                    @if ($appliedJobs->count() > 0)
-                                        @foreach ($appliedJobs as $job)
+                                    @if ($jobs->count() > 0)
+                                        @foreach($jobs as $job)
                                             <div class="accordion-item tw-mt-5">
                                                 <h2 class="accordion-header" id="heading{{ $job->id }}">
                                                     <div class="accordion-button tw-flex tw-gap-2 tw-flex-wrap tw-justify-between tw-p-5">
@@ -111,7 +111,7 @@
                                                             </div>
                                                         </div>
                                                         <div class="tw-whitespace-nowrap tw-text-sm tw-text-[#5E6670]">
-                                                            {{ date('M d, Y s:m', strtotime($job->pivot->created_at)) }}
+                                                            {{ \Carbon\Carbon::parse($job->created_at)->format('M d, Y') }}
                                                         </div>
                                                         <div
                                                             class="text-{{ $job->deadline_active ? 'success' : 'danger' }}-500">
@@ -237,9 +237,9 @@
                             </div>
                         </div>
                         <div class="rt-pt-30">
-                            @if ($appliedJobs->total() > $appliedJobs->count())
+                            @if ($jobs->total() > $jobs->count())
                                 <nav>
-                                    {{ $appliedJobs->links('vendor.pagination.frontend') }}
+                                    {{ $jobs->links('vendor.pagination.frontend') }}
                                 </nav>
                             @endif
                         </div>

@@ -7,24 +7,16 @@
 @endsection
 
 @section('main')
-    <div class="dashboard-wrapper">
+    <div class="dashboard-wrapper seeker-settings-page">
         <div class="container">
-            <div class="row">
-                {{-- <x-website.candidate.sidebar /> --}}
-                <div class="col-lg-9">
-                    <div class="dashboard-right">
-                        <div class="dashboard-right-header md:tw-mb-8 tw-mb-4">
-                            <div class="left-text m-0">
-                                <h3 class="f-size-18 lh-1 m-0">
-                                    {{ __('favorite_jobs') }}
-                                    <span class="text-gray-400">({{ $jobs->total() }})</span>
-                                </h3>
-                            </div>
-                            {{-- <span class="sidebar-open-nav">
-                                <i class="ph-list"></i>
-                            </span> --}}
-                        </div>
-                        <div>
+            <div class="dashboard-right">
+
+                <x-website.candidate.seeker-page-header
+                    :title="__('favorite_jobs') . ' (' . $jobs->total() . ')'"
+                    :subtitle="__('Jobs you saved for later.')"
+                />
+
+                <div class="glass-card"><div class="glass-card-body">
                             @if ($jobs->count() > 0)
                                 @foreach ($jobs as $job)
                                     <div class="f-jobs-card tw-overflow-x-auto md:tw-px-5 md:tw-py-5 tw-px-0 tw-py-5 tw-transition-all tw-duration-500">
@@ -184,14 +176,10 @@
                                 </nav>
                             @endif
                         </div>
-                    </div>
+                    </div></div>
                 </div>
             </div>
         </div>
-        <div class="dashboard-footer text-center body-font-4 text-gray-500">
-            {{-- <x-website.footer-copyright /> --}}
-        </div>
-    </div>
 
     {{-- Apply job Modal --}}
     <div class="modal fade" id="cvModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">

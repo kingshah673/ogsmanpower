@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Services\Company\CompanyDocumentVerificationService;
 use Modules\Plan\Entities\Plan;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -23,8 +24,10 @@ class Company extends Model implements HasMedia
 
     protected $casts = [
         'establishment_date' => 'datetime',
+        'document_verified_at' => 'datetime',
         'profile_completion' => 'boolean',
         'is_profile_verified' => 'boolean',
+        'documents_resubmit_required' => 'boolean',
     ];
 
     protected static function booted()
@@ -53,6 +56,8 @@ class Company extends Model implements HasMedia
                     'order' => 4,
                 ],
             ]);
+
+            CompanyDocumentVerificationService::assignDefaultDocumentTypes($company);
         });
     }
 
@@ -78,7 +83,7 @@ class Company extends Model implements HasMedia
      */
     public function getLogoUrlAttribute()
     {
-        if (! $this->logo) {
+        if (! publicUploadExists($this->logo)) {
             return asset('backend/image/default.png');
         }
 
@@ -93,11 +98,21 @@ class Company extends Model implements HasMedia
      */
     public function getBannerUrlAttribute()
     {
-        if (! $this->banner) {
+        if (! publicUploadExists($this->banner)) {
             return asset('backend/image/default.png');
         }
 
         return asset($this->banner);
+    }
+
+    public function logoFileExists(): bool
+    {
+        return publicUploadExists($this->logo);
+    }
+
+    public function bannerFileExists(): bool
+    {
+        return publicUploadExists($this->banner);
     }
 
     /**
@@ -129,7 +144,7 @@ class Company extends Model implements HasMedia
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withDefault();
     }
 
     /**
@@ -241,18 +256,25 @@ class Company extends Model implements HasMedia
         return $this->hasMany(CompanyQuestion::class);
     }
 
+    public function verificationDocumentAssignments(): HasMany
+    {
+        return $this->hasMany(CompanyVerificationDocumentAssignment::class);
+    }
+
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('document')->singleFile();
-
+        $this->addMediaCollection('document')->singleFile()->useDisk('public');
+        $this->addMediaCollection('trade_license')->singleFile()->useDisk('public');
+        $this->addMediaCollection('company_registration')->singleFile()->useDisk('public');
+        $this->addMediaCollection(CompanyDocumentVerificationService::MEDIA_COLLECTION)->useDisk('public');
     }
 
     public function getLogoUrl()
     {
-        if ($this->logo_url && file_exists(public_path($this->logo_url))) {
-            return asset($this->logo_url);
-        } else {
-            return asset('backend/image/default.png');
+        if (publicUploadExists($this->logo)) {
+            return asset($this->logo);
         }
+
+        return asset('backend/image/default.png');
     }
 }

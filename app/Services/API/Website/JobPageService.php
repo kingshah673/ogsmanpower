@@ -20,7 +20,7 @@ class JobPageService
     public function execute($request)
     {
         if (auth()->user()) {
-            $query = Job::with('company.user', 'category', 'job_type:id,name')
+            $query = Job::with('company.user', 'category', 'job_type')
                 ->withCount([
                     'bookmarkJobs', 'appliedJobs',
                     'bookmarkJobs as bookmarked' => function ($q) {
@@ -32,7 +32,7 @@ class JobPageService
                 ->active()->withoutEdited();
         } else {
 
-            $query = Job::with('company.user', 'category', 'job_type:id,name')
+            $query = Job::with('company.user', 'category', 'job_type')
                 ->withCount([
                     'bookmarkJobs', 'appliedJobs',
                     'bookmarkJobs as bookmarked' => function ($q) {
@@ -159,7 +159,7 @@ class JobPageService
 
         // Job type filter
         if ($request->has('job_type') && $request->job_type != null) {
-            $job_type_id = JobType::where('name', $request->job_type)->value('id');
+            $job_type_id = JobType::whereTranslation('name', $request->job_type)->value('id');
             $query->where('job_type_id', $job_type_id);
         }
 

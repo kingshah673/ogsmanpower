@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\WhatsAppWebhookController;
 
 // Include other route files
 include base_path('routes/admin.php');

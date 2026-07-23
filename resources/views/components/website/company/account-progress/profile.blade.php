@@ -1,4 +1,4 @@
-@props(['countries', 'user', 'organizationTypes', 'industryTypes', 'teamSizes'])
+@props(['countries', 'user', 'organizationTypes', 'industryTypes', 'teamSizes', 'longForm' => false])
 
 <form action="{{ route('company.profile.complete', auth()->user()->id) }}" method="post">
     @method('PUT')
@@ -94,19 +94,25 @@
                         </label>
                         <div class="fromGroup">
                             <div class="form-control-icon date datepicker">
-                                <input autocomplete="off" name="establishment_date" placeholder="m/d/y" type="text"
-                                    class="form-control @error('establishment_date') is-invalid @enderror"
-                                    id="date"
-                                    value="{{ $user->company->establishment_date ? date('d-m-Y', strtotime($user->company->establishment_date)) : old('establishment_date') }}" />
-                                <span class="input-group-addon has-badge">
-                                    <x-svg.calendar-icon />
-                                </span>
-                                @error('establishment_date')
-                                    <span class="invalid-feedback" role="alert">
-                                        <strong>{{ __($message) }}</strong>
-                                    </span>
-                                @enderror
-                            </div>
+    <input autocomplete="off" 
+        name="establishment_date" 
+        placeholder="dd-mm-yyyy" 
+        type="text"
+        class="form-control @error('establishment_date') is-invalid @enderror"
+        id="date"
+        max="{{ \Carbon\Carbon::now()->subMonths(3)->format('d-m-Y') }}"
+        value="{{ $user->company->establishment_date ? date('d-m-Y', strtotime($user->company->establishment_date)) : old('establishment_date') }}" />
+
+    <span class="input-group-addon has-badge">
+        <x-svg.calendar-icon />
+    </span>
+
+    @error('establishment_date')
+        <span class="invalid-feedback" role="alert">
+            <strong>{{ __($message) }}</strong>
+        </span>
+    @enderror
+</div>
                         </div>
                     </div>
                     <div class="col-12">
@@ -125,55 +131,22 @@
                 </div>
             </div>
         </div>
+        @unless($longForm)
         <a href="{{ url('company/account-progress') }}">
             <button type="button" class="btn previous bg-gray-50 rt-mr-8">
                 {{ __('previous') }}
             </button>
         </a>
-        <button type="submit" class="btn next btn-primary">
+        @endunless
+        <button type="submit" class="btn btn-primary">
             <span class="button-content-wrapper ">
                 <span class="button-icon align-icon-right">
                     <i class="ph-arrow-right"></i>
                 </span>
                 <span class="button-text">
-                    {{ __('save_next') }}
+                    {{ $longForm ? __('save') : __('save_next') }}
                 </span>
             </span>
         </button>
     </fieldset>
 </form>
-
-@push('frontend_scripts')
-<script src="{{ asset('frontend/assets/js/bootstrap-datepicker.min.js') }}"></script>
-@if (app()->getLocale() == 'ar')
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.ar.min.js
-"></script>
-@endif
-<script>
-        function UploadMode(param) {
-            if (param === 'photo') {
-                $('#photo-uploadMode').removeClass('d-none');
-                $('#photo-oldMode').addClass('d-none');
-            } else {
-                $('#banner-uploadMode').removeClass('d-none');
-                $('#banner-oldMode').addClass('d-none');
-            }
-        }
-    </script>
-    <script src="{{ asset('frontend') }}/assets/js/ckeditor.min.js"></script>
-    <script>
-        ClassicEditor
-            .create(document.querySelector('#default'))
-            .catch(error => {
-                console.error(error);
-            });
-        //init datepicker
-        $("#date").attr("autocomplete", "off");
-        //init datepicker
-        $('#date').datepicker({
-            format: 'dd-mm-yyyy',
-            isRTL: "{{ app()->getLocale() == 'ar' ? true : false }}",
-            language: "{{ app()->getLocale() }}",
-        });
-    </script>
-@endpush

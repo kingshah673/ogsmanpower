@@ -208,12 +208,19 @@ a:hover{
 @endsection
 
 @section('main')
-    <div class="dashboard-wrapper">
+    <div class="dashboard-wrapper seeker-module-page">
         <div class="container">
-            <div class="row">
-                {{-- Sidebar --}}
-                {{-- <x-website.company.sidebar /> --}}
-                <div class="col-lg-9">
+            <div class="dashboard-right">
+
+                <x-website.company.employer-page-header
+                    :title="__('plans_billing')"
+                    subtitle="View your current plan, usage and billing history."
+                />
+
+                <div class="glass-card">
+                <div class="glass-card-body">
+
+                <div class="col-lg-12">
                     <div class="dashboard-right tw-ps-0 lg:tw-ps-5">
                         <div class="row tw-my-5">
                             <div class="col-lg-5">
@@ -395,7 +402,11 @@ a:hover{
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
+
+                </div>{{-- glass-card-body --}}
+                </div>{{-- glass-card --}}
+
+            </div>{{-- dashboard-right --}}
+        </div>{{-- container --}}
+    </div>{{-- dashboard-wrapper --}}
 @endsection

@@ -29,13 +29,13 @@ class ProfileController extends Controller
     public function profile()
     {
         try {
-            $user = auth()->user();
+            $user = auth('admin')->user();
 
             return view('backend.profile.index', compact('user'));
         } catch (\Exception $e) {
             flashError('An error occurred: ' . $e->getMessage());
 
-            return back();
+            return redirect()->route('admin.dashboard');
         }
     }
 
@@ -47,7 +47,7 @@ class ProfileController extends Controller
     public function setting()
     {
         try {
-            $user = Admin::find(auth()->id());
+            $user = auth('admin')->user();
             $industry_types = IndustryType::all()->sortBy('name');
 
 
@@ -55,7 +55,7 @@ class ProfileController extends Controller
         } catch (\Exception $e) {
             flashError('An error occurred: ' . $e->getMessage());
 
-            return back();
+            return redirect()->route('admin.dashboard');
         }
     }
 
@@ -68,7 +68,11 @@ class ProfileController extends Controller
     {
         try {
             $data = $request->only(['name', 'email', 'username', 'industry_type_id', 'website', 'bio', 'district', 'country', 'state','whatsapp']);
-            $user = Admin::find(auth()->id());
+            $user = auth('admin')->user();
+
+            if (! $user instanceof Admin) {
+                return redirect()->route('login.admin');
+            }
 
             $data['username'] = $request->username ?? Str::slug($data['name']) . '_' . time();
             $data['industry_type_id'] = $request->industry_type_id;

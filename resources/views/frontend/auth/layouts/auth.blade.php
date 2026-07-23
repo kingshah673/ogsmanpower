@@ -7,6 +7,7 @@
     @yield('meta')
     <meta name="description" content="@yield('description')">
     <meta property="og:image" content="@yield('og:image')">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     {{-- <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" /> --}}
     <title>@yield('title') - {{ config('app.name') }}</title>
     <style>
@@ -75,11 +76,8 @@
         }
 
     </style>
-<!-- CSS -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.min.css">
 
-<!-- JS -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js"></script>
+    {{-- intl-tel-input loaded globally via styles/scripts partials --}}
 
     {{-- Style --}}
     @include('frontend.partials.styles')
@@ -95,7 +93,7 @@
     
     @yield('content')
 {{-- footer --}}
-    @if (!Route::is('candidate.*') && !Route::is('company.*'))
+    @if (!Route::is('candidate.*') && !Route::is('company.*') && !Route::is('agency.*'))
         @include('frontend.partials.footer')
     @endif
 
@@ -108,7 +106,7 @@
 
     <!-- scripts -->
     @include('frontend.partials.scripts')
-    @yield('script')
+    {{-- @yield('script') is already rendered inside frontend.partials.scripts — do not yield again --}}
 
     <!-- PWA Script Start -->
     @if ($setting->pwa_enable)

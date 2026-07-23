@@ -28,7 +28,10 @@ class ProfessionController extends Controller
         try {
             abort_if(! userCan('professions.view'), 403);
 
-            $professions = Profession::all();
+            $professions = Profession::query()
+                ->orderByDesc('id')
+                ->paginate(50)
+                ->withQueryString();
             $app_language = Language::latest()->get(['code', 'name']);
 
             return view('backend.profession.index', compact('professions', 'app_language'));
@@ -86,7 +89,10 @@ class ProfessionController extends Controller
             abort_if(! userCan('professions.update'), 403);
 
             $prof = $profession;
-            $professions = Profession::all();
+            $professions = Profession::query()
+                ->orderByDesc('id')
+                ->paginate(50)
+                ->withQueryString();
             $app_language = Language::latest()->get(['code', 'name']);
 
             return view('backend.profession.index', compact('prof', 'professions', 'app_language'));

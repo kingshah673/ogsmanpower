@@ -17,9 +17,13 @@
                                         class="btn bg-primary"><i
                                             class="fas fa-plus mr-1"></i> {{ __('create') }}
                                     </a>
-                                    <a href="{{ route('admin.company.dyanmic_inputs') }}"
+                                    <a href="{{ route('admin.company.dynamic_inputs') }}"
                                                     class="btn btn-primary">
                                                     Inputs
+                                                </a>
+                                    <a href="{{ route('admin.company.verification_document_types.index') }}"
+                                                    class="btn btn-outline-primary">
+                                                    {{ __('verification_documents') }}
                                                 </a>
                                 @endif
                                 @if (request('keyword') || request('ev_status') || request('sort_by') || request('organization_type') || request('industry_type'))
@@ -31,6 +35,29 @@
                            </div>
                         </div>
                     </div>
+
+                    @if (userCan('company.update'))
+                        <div class="card-body border-bottom bg-light py-3">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap">
+                                <div class="pr-3 mb-2 mb-md-0">
+                                    <h5 class="mb-1">{{ __('employer_registration_settings') }}</h5>
+                                    <p class="mb-0 text-muted small">{{ __('employer_corporate_email_required_help') }}</p>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <p style="min-width: 180px; margin-bottom: 0; margin-right: 10px;"
+                                        class="{{ $employer_corporate_email_required ? 'active' : '' }}"
+                                        id="corporate_email_status">
+                                        {{ $employer_corporate_email_required ? __('employer_corporate_email_required_on') : __('employer_corporate_email_required_off') }}
+                                    </p>
+                                    <label class="switch mb-0">
+                                        <input type="checkbox" class="success corporate-email-switch"
+                                            {{ $employer_corporate_email_required ? 'checked' : '' }}>
+                                        <span class="slider round"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
 
                     {{-- Filter  --}}
                     <form id="formSubmit"  action="{{ route('company.index') }}" method="GET" onchange="this.submit();">
@@ -304,6 +331,37 @@
 
 @section('script')
     <script>
+        $('.corporate-email-switch').on('change', function() {
+            var status = $(this).prop('checked') == true ? 1 : 0;
+            $.ajax({
+                type: "GET",
+                dataType: "json",
+                url: '{{ route('company.registration.corporate_email.change') }}',
+                data: {
+                    'status': status
+                },
+                success: function(response) {
+                    toastr.success(response.message, 'Success');
+                },
+                error: function(xhr) {
+                    var message = xhr.responseJSON && xhr.responseJSON.message
+                        ? xhr.responseJSON.message
+                        : '{{ __('something_went_wrong') }}';
+                    toastr.error(message, 'Error');
+                }
+            });
+
+            if (status == 1) {
+                $('#corporate_email_status')
+                    .addClass('active')
+                    .text("{{ __('employer_corporate_email_required_on') }}");
+            } else {
+                $('#corporate_email_status')
+                    .removeClass('active')
+                    .text("{{ __('employer_corporate_email_required_off') }}");
+            }
+        });
+
         $('.status-switch').on('change', function() {
             var status = $(this).prop('checked') == true ? 1 : 0;
             var id = $(this).data('id');

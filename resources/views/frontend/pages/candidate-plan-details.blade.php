@@ -76,28 +76,44 @@
                     @endif
 
                     {{-- Stripe payment --}}
-                    @if (config('templatecookie.stripe_active') && config('templatecookie.stripe_key') && config('templatecookie.stripe_secret'))
-                        <div class="col-4 my-2">
-                            <div class="card jobcardStyle1">
-                                <div class="card-body">
-                                    <div class="rt-single-icon-box">
-                                        <div class="iconbox-content">
-                                            <div class="body-font-1 rt-mb-12">
-                                                {{ __('stripe') }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="post-info d-flex">
-                                        <div class="flex-grow-1">
-                                            <button id="stripe_btn" type="button" class="btn btn-primary2-50 d-block">
-                                                {{ __('pay_now') }}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+@if (config('templatecookie.stripe_active') && config('templatecookie.stripe_key') && config('templatecookie.stripe_secret'))
+
+    <div class="col-4 my-2">
+        <div class="card jobcardStyle1">
+            <div class="card-body">
+
+                <div class="rt-single-icon-box">
+                    <div class="iconbox-content">
+                        <div class="body-font-1 rt-mb-12">
+                            {{ __('Stripe') }}
                         </div>
-                    @endif
+                    </div>
+                </div>
+
+                <div class="post-info d-flex">
+                    <div class="flex-grow-1">
+
+                        <form action="{{ route('stripe.post') }}" method="POST">
+
+                            @csrf
+
+                            <button type="submit"
+                                class="btn btn-primary2-50 d-block w-100">
+
+                                {{ __('Pay Now') }}
+
+                            </button>
+
+                        </form>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+@endif
 
                 @else
                     <div class="text-center">
@@ -146,18 +162,19 @@
 
 
         {{-- Stripe Form --}}
-        <form action="{{ route('candidateStripe') }}" method="POST" class="d-none">
-            @csrf
-            <input type="hidden" name="candidate_id" value="{{auth()->user()->candidate->id}}">
-            <input type="hidden" name="plan_id" value="{{$plan->id}}">
-            <input type="hidden" name="duration" value="{{$plan->duration}}">
-            <input type="hidden" name="amount" value="{{$plan->price}}">
+       {{-- Stripe Form --}}
+<form action="{{ route('stripe.post') }}" method="POST">
 
-            <script id="stripe_script" src="https://checkout.stripe.com/checkout.js" class="stripe-button"
-                data-key="{{ config('templatecookie.stripe_key') }}" data-amount="{{ $plan->price*100 }}"
-                data-name="{{ config('app.name') }}" data-description="Money pay with stripe"
-                data-locale="{{ app()->getLocale() == 'default' ? 'en' : app()->getLocale() }}" data-currency="{{ $code }}"></script>
-        </form>
+    @csrf
+
+    <button type="submit"
+        class="btn btn-primary2-50 d-block w-100">
+
+        {{ __('Pay Now') }}
+
+    </button>
+
+</form>
 
 
     </section>
@@ -181,10 +198,10 @@
 
 
         // Stripe
-        $('#stripe_btn').on('click', function(e) {
-            e.preventDefault();
-            $('.stripe-button-el').click();
-        });
+        //$('#stripe_btn').on('click', function(e) {
+        //    e.preventDefault();
+       //     $('.stripe-button-el').click();
+       // });
 
         //iyzipay
         $('#iyzipay_btn').on('click', function(e) {

@@ -407,6 +407,23 @@
         </div>
     </div>
     @endif
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="ll-card">
+                    <div class="ll-card-header">
+                        <h3 class="ll-card-title">{{ __('verification_documents') }}</h3>
+                    </div>
+                    <div class="ll-card-body">
+                        @include('backend.company.partials.verification-documents-card', [
+                            'company' => $company,
+                            'allDocumentTypes' => \App\Services\Company\CompanyDocumentVerificationService::allActiveDocumentTypes(),
+                        ])
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('style')
@@ -612,6 +629,89 @@
             }else{
                 $(`#verification_status_${id}`).text("{{ __('unverified') }}")
             }
+        });
+    </script>
+    <script>
+        $('#document_verify_admin').on('change', function() {
+            $.ajax({
+                type: 'GET',
+                dataType: 'json',
+                url: '{{ route('admin.document.verify.change', $company) }}',
+                success: function(response) {
+                    toastr.success(response.message, 'Success');
+                    setTimeout(function () { window.location.reload(); }, 800);
+                },
+                error: function(xhr) {
+                    const message = xhr.responseJSON?.message || '{{ __('something_went_wrong') }}';
+                    toastr.error(message, 'Error');
+                    window.location.reload();
+                }
+            });
+        });
+
+        $('#requestResubmitForm').on('submit', function(e) {
+            e.preventDefault();
+            $.ajax({
+                type: 'POST',
+                dataType: 'json',
+                url: '{{ route('admin.company.documents.request_resubmit', $company) }}',
+                data: {
+                    _token: '{{ csrf_token() }}',
+                    document_review_note: $('#document_review_note').val()
+                },
+                success: function(response) {
+                    toastr.success(response.message, 'Success');
+                },
+                error: function(xhr) {
+                    const message = xhr.responseJSON?.message || '{{ __('something_went_wrong') }}';
+                    toastr.error(message, 'Error');
+                }
+            });
+        });
+
+        function syncAssignmentFieldState() {
+            $('#companyDocumentAssignmentsForm .assignment-checkbox').each(function () {
+                const enabled = $(this).is(':checked');
+                const typeId = $(this).data('type-id');
+                const row = $(this).closest('.border.rounded.p-3');
+                row.find('.assignment-type-id').prop('disabled', !enabled);
+                row.find('.assignment-required').prop('disabled', !enabled);
+            });
+        }
+
+        syncAssignmentFieldState();
+        $(document).on('change', '.assignment-checkbox', syncAssignmentFieldState);
+
+        $('#companyDocumentAssignmentsForm').on('submit', function (e) {
+            e.preventDefault();
+            const assignments = [];
+            $('#companyDocumentAssignmentsForm .assignment-checkbox:checked').each(function () {
+                const typeId = $(this).data('type-id');
+                const row = $(this).closest('.border.rounded.p-3');
+                assignments.push({
+                    document_type_id: typeId,
+                    is_required: row.find('.assignment-required').is(':checked') ? 1 : 0,
+                    sort_order: assignments.length + 1,
+                });
+            });
+
+            $.ajax({
+                type: 'POST',
+                dataType: 'json',
+                url: '{{ route('admin.company.documents.assignments', $company) }}',
+                data: {
+                    _token: '{{ csrf_token() }}',
+                    assignments: assignments,
+                },
+                success: function (response) {
+                    toastr.success(response.message, 'Success');
+                    setTimeout(function () { window.location.reload(); }, 700);
+                },
+                error: function (xhr) {
+                    const message = xhr.responseJSON?.message || '{{ __('something_went_wrong') }}';
+                    toastr.error(message, 'Error');
+                }
+            });
         });
     </script>
     <!-- ================ google map ============== -->

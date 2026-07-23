@@ -6,277 +6,379 @@
 @endsection
 @section('main')
 
-    <div class="dashboard-wrapper">
+    <div class="dashboard-wrapper seeker-settings-page">
         <div class="container">
-            <div class="row">
-                <div class="col-lg-9">
-                    <div class="dashboard-right">
-                        <div class="cadidate-dashboard-tabs candidate ">
-                            <div >
-                                <div>
-                                    <div class="tw-flex rt-mb-32 lg:tw-mt-0 tw-items-center tw-justify-between">
-                                        <h3 class="f-size-18 tw-flex-shrink-0 lh-1 m-0">{{ __('Documents') }}</h3>
-                                    </div>
-                                    <form id="attachmentForm"
-                                        action="{{ route('candidate.settingUpdate') }}" method="POST"
-                                        enctype="multipart/form-data">
-                                        @csrf
-                                        @method('put')
-                                        <input type="hidden" name="type" value="documents">
+            <div class="dashboard-right">
 
-                                        <div class="row">
+                <x-website.candidate.seeker-page-header
+                    :title="__('Documents')"
+                    :subtitle="__('Upload passport, CNIC, and other supporting documents.')"
+                />
 
-                                            <!-- Passport Image Section -->
-                                            <div class="form-group">
-                                                <label>Passport Image</label><small style="color: red">* (
-                                                    {{ __('Ratio') }} 4:3 )</small>
-                                                <div class="custom-file">
+                        <div class="glass-card"><div class="glass-card-body">
+
+                                @if(session('success'))
+                                    <div class="alert alert-success">{{ session('success') }}</div>
+                                @endif
+                                @if(session('error'))
+                                    <div class="alert alert-danger">{{ session('error') }}</div>
+                                @endif
+
+                                <form id="attachmentForm"
+                                    action="{{ route('candidate.settingUpdate') }}" method="POST"
+                                    enctype="multipart/form-data">
+                                    @csrf
+                                    @method('put')
+                                    <input type="hidden" name="type" value="documents">
+
+                                    <div class="row g-4">
+
+                                        {{-- Passport Image --}}
+                                        <div class="col-md-6">
+                                            <div class="card border-0 shadow-sm h-100">
+                                                <div class="card-body">
+                                                    <label class="form-label fw-semibold">
+                                                        {{ __('Passport Image') }}
+                                                        <small class="text-danger">* ({{ __('Ratio') }} 4:3)</small>
+                                                    </label>
                                                     <input type="file" name="passport_image" id="passportImageInput"
-                                                        class="custom-file-input"
-                                                        accept=".jpg, .png, .jpeg, .gif, .bmp, .tif, .tiff|image/*">
-                                                    <label class="custom-file-label" for="passportImageInput">Choose
-                                                        File</label>
+                                                        class="form-control"
+                                                        accept=".jpg,.png,.jpeg,.gif,.bmp,.tif,.tiff">
+                                                    <div class="text-center pt-3">
+                                                        <img style="height:180px; border:1px solid #dee2e6; border-radius:10px; object-fit:cover;"
+                                                            id="passportImagePreview"
+                                                            src="{{ isset($attachments) && $attachments->passport_image ? asset('storage/candidates/'.$attachments->passport_image) : asset('images/candidates/img1.jpg') }}"
+                                                            alt="passport">
+                                                    </div>
+                                                    {{-- OCR Scan Button --}}
+                                                    <div class="mt-3 d-flex gap-2">
+                                                        <button type="button" id="ocrScanBtn"
+                                                            class="btn btn-sm btn-outline-primary w-100"
+                                                            onclick="triggerPassportOCR()">
+                                                            🔍 {{ __('Scan Passport OCR') }}
+                                                        </button>
+                                                        @if(isset($attachments) && $attachments->passport_image)
+                                                            <button type="button"
+                                                                class="btn btn-sm btn-outline-info w-100"
+                                                                onclick="scanExistingPassport('{{ asset('storage/candidates/'.$attachments->passport_image) }}')">
+                                                                📄 {{ __('Re-scan Saved') }}
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                    <div id="ocrStatus" class="mt-2 small text-muted" style="display:none;"></div>
                                                 </div>
-                                                <center class="pt-4">
-                                                    <img style="height: 200px; border: 1px solid; border-radius: 10px;"
-                                                        id="passportImagePreview"
-                                                        src="{{ isset($attachments) && $attachments->passport_image ? asset('storage/candidates/' . $attachments->passport_image) : asset('images/candidates/img1.jpg') }}"
-                                                        alt="passport-image">
-                                                </center>
                                             </div>
-
-                                            <!-- CNIC FRONt -->
-                                            <div class="form-group">
-                                                <label>CNIC Front</label><small style="color: red">* (
-                                                    {{ __('Ratio') }} 4:3 )</small>
-                                                <div class="custom-file">
-                                                    <input type="file" name="cnic_front" id="cnicFrontImageInput"
-                                                        class="custom-file-input"
-                                                        accept=".jpg, .png, .jpeg, .gif, .bmp, .tif, .tiff|image/*">
-                                                    <label class="custom-file-label" for="cnicFrontImageInput">Choose
-                                                        File</label>
-                                                </div>
-                                                <center class="pt-4">
-                                                    <img style="height: 200px; border: 1px solid; border-radius: 10px;"
-                                                        id="cnicFrontPreview"
-                                                        src="{{ isset($attachments) && $attachments->cnic_front ? asset('storage/candidates/' . $attachments->cnic_front) : asset('images/candidates/img1.jpg') }}"
-                                                        alt="cnic-front">
-                                                </center>
-                                            </div>
-                                            <!-- CNIC Back -->
-
-                                            <div class="form-group">
-                                                <label>CNIC Back</label><small style="color: red">* (
-                                                    {{ __('Ratio') }} 4:3 )</small>
-                                                <div class="custom-file">
-                                                    <input type="file" name="cnic_back" id="cnicBackImageInput"
-                                                        class="custom-file-input"
-                                                        accept=".jpg, .png, .jpeg, .gif, .bmp, .tif, .tiff|image/*">
-                                                    <label class="custom-file-label" for="cnicBackImageInput">Choose
-                                                        File</label>
-                                                </div>
-                                                <center class="pt-4">
-                                                    <img style="height: 200px; border: 1px solid; border-radius: 10px;"
-                                                        id="cnicBackPreview"
-                                                        src="{{ isset($attachments) && $attachments->cnic_back ? asset('storage/candidates/' . $attachments->cnic_back) : asset('images/candidates/img1.jpg') }}"
-                                                        alt="cnic-back">
-                                                </center>
-                                            </div>
-                                            {{-- Police Character Certificate --}}
-                                            <div class="form-group">
-                                                <label>Police Character Certificate</label><small style="color: red">* (
-                                                    {{ __('Ratio') }} 4:3 )</small>
-                                                <div class="custom-file">
-                                                    <input type="file" name="police_character_certificate" id="pPCImageInput"
-                                                        class="custom-file-input"
-                                                        accept=".jpg, .png, .jpeg, .gif, .bmp, .tif, .tiff|image/*">
-                                                    <label class="custom-file-label" for="pPCImageInput">Choose
-                                                        File</label>
-                                                </div>
-                                                <center class="pt-4">
-                                                    <img style="height: 200px; border: 1px solid; border-radius: 10px;"
-                                                        id="pPCPreview"
-                                                        src="{{ isset($attachments) && $attachments->police_character_certificate ? asset('storage/candidates/' . $attachments->police_character_certificate) : asset('images/candidates/img1.jpg') }}"
-                                                        alt="Police-character-certificate-image">
-                                                </center>
-                                            </div>
-                                            {{-- Medical --}}
-                                            <div class="form-group">
-                                                <label>Medical</label><small style="color: red">* (
-                                                    {{ __('Ratio') }} 4:3 )</small>
-                                                <div class="custom-file">
-                                                    <input type="file" name="medical" id="medicalImageInput"
-                                                        class="custom-file-input"
-                                                        accept=".jpg, .png, .jpeg, .gif, .bmp, .tif, .tiff|image/*">
-                                                    <label class="custom-file-label" for="medicalImageInput">Choose
-                                                        File</label>
-                                                </div>
-                                                <center class="pt-4">
-                                                    <img style="height: 200px; border: 1px solid; border-radius: 10px;"
-                                                        id="medicalPreview"
-                                                        src="{{ isset($attachments) && $attachments->medical ? asset('storage/candidates/' . $attachments->medical) : asset('images/candidates/img1.jpg') }}"
-                                                        alt="medical-image">
-                                                </center>
-                                            </div>
-                                            {{-- NAVTEC Report --}}
-                                            <div class="form-group">
-                                                <label>NAVTEC Report</label><small style="color: red">* (
-                                                    {{ __('Ratio') }} 4:3 )</small>
-                                                <div class="custom-file">
-                                                    <input type="file" name="navtec_report" id="navtecImageInput"
-                                                        class="custom-file-input"
-                                                        accept=".jpg, .png, .jpeg, .gif, .bmp, .tif, .tiff|image/*">
-                                                    <label class="custom-file-label" for="navtecImageInput">Choose
-                                                        File</label>
-                                                </div>
-                                                <center class="pt-4">
-                                                    <img style="height: 200px; border: 1px solid; border-radius: 10px;"
-                                                        id="navtecPreview"
-                                                        src="{{ isset($attachments) && $attachments->navtec_report ? asset('storage/candidates/' . $attachments->navtec_report) : asset('images/candidates/img1.jpg') }}"
-                                                        alt="navtec-report">
-                                                </center>
-                                            </div>
-                                            @if (isset($attachments))
-                                                <div class="col-lg-12 mt-4">
-                                                    <button type="submit" class="btn btn-primary">
-                                                        {{ __('Update Documents') }}
-                                                    </button>
-                                                </div>
-                                            @else
-                                                <div class="col-lg-12 mt-4">
-                                                    <button type="submit" class="btn btn-primary">
-                                                        {{ __('Upload Documents') }}
-                                                    </button>
-                                                </div>
-                                            @endif
-
-
                                         </div>
-                                    </form>
-                                </div>
 
+                                        {{-- CNIC Front --}}
+                                        <div class="col-md-6">
+                                            <div class="card border-0 shadow-sm h-100">
+                                                <div class="card-body">
+                                                    <label class="form-label fw-semibold">
+                                                        {{ __('CNIC Front') }}
+                                                        <small class="text-danger">* ({{ __('Ratio') }} 4:3)</small>
+                                                    </label>
+                                                    <input type="file" name="cnic_front" id="cnicFrontImageInput"
+                                                        class="form-control"
+                                                        accept=".jpg,.png,.jpeg,.gif,.bmp,.tif,.tiff">
+                                                    <div class="text-center pt-3">
+                                                        <img style="height:180px; border:1px solid #dee2e6; border-radius:10px; object-fit:cover;"
+                                                            id="cnicFrontPreview"
+                                                            src="{{ isset($attachments) && $attachments->cnic_front ? asset('storage/candidates/'.$attachments->cnic_front) : asset('images/candidates/img1.jpg') }}"
+                                                            alt="cnic-front">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
 
+                                        {{-- CNIC Back --}}
+                                        <div class="col-md-6">
+                                            <div class="card border-0 shadow-sm h-100">
+                                                <div class="card-body">
+                                                    <label class="form-label fw-semibold">
+                                                        {{ __('CNIC Back') }}
+                                                        <small class="text-danger">* ({{ __('Ratio') }} 4:3)</small>
+                                                    </label>
+                                                    <input type="file" name="cnic_back" id="cnicBackImageInput"
+                                                        class="form-control"
+                                                        accept=".jpg,.png,.jpeg,.gif,.bmp,.tif,.tiff">
+                                                    <div class="text-center pt-3">
+                                                        <img style="height:180px; border:1px solid #dee2e6; border-radius:10px; object-fit:cover;"
+                                                            id="cnicBackPreview"
+                                                            src="{{ isset($attachments) && $attachments->cnic_back ? asset('storage/candidates/'.$attachments->cnic_back) : asset('images/candidates/img1.jpg') }}"
+                                                            alt="cnic-back">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
 
-                            </div>
-                        </div>
+                                        {{-- Police Character Certificate --}}
+                                        <div class="col-md-6">
+                                            <div class="card border-0 shadow-sm h-100">
+                                                <div class="card-body">
+                                                    <label class="form-label fw-semibold">
+                                                        {{ __('Police Character Certificate') }}
+                                                        <small class="text-danger">* ({{ __('Ratio') }} 4:3)</small>
+                                                    </label>
+                                                    <input type="file" name="police_character_certificate" id="pPCImageInput"
+                                                        class="form-control"
+                                                        accept=".jpg,.png,.jpeg,.gif,.bmp,.tif,.tiff">
+                                                    <div class="text-center pt-3">
+                                                        <img style="height:180px; border:1px solid #dee2e6; border-radius:10px; object-fit:cover;"
+                                                            id="pPCPreview"
+                                                            src="{{ isset($attachments) && $attachments->police_character_certificate ? asset('storage/candidates/'.$attachments->police_character_certificate) : asset('images/candidates/img1.jpg') }}"
+                                                            alt="police-cert">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
 
-                    </div>
+                                        {{-- Medical --}}
+                                        <div class="col-md-6">
+                                            <div class="card border-0 shadow-sm h-100">
+                                                <div class="card-body">
+                                                    <label class="form-label fw-semibold">
+                                                        {{ __('Medical') }}
+                                                        <small class="text-danger">* ({{ __('Ratio') }} 4:3)</small>
+                                                    </label>
+                                                    <input type="file" name="medical" id="medicalImageInput"
+                                                        class="form-control"
+                                                        accept=".jpg,.png,.jpeg,.gif,.bmp,.tif,.tiff">
+                                                    <div class="text-center pt-3">
+                                                        <img style="height:180px; border:1px solid #dee2e6; border-radius:10px; object-fit:cover;"
+                                                            id="medicalPreview"
+                                                            src="{{ isset($attachments) && $attachments->medical ? asset('storage/candidates/'.$attachments->medical) : asset('images/candidates/img1.jpg') }}"
+                                                            alt="medical">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {{-- NAVTEC Report --}}
+                                        <div class="col-md-6">
+                                            <div class="card border-0 shadow-sm h-100">
+                                                <div class="card-body">
+                                                    <label class="form-label fw-semibold">
+                                                        {{ __('NAVTEC Report') }}
+                                                        <small class="text-danger">* ({{ __('Ratio') }} 4:3)</small>
+                                                    </label>
+                                                    <input type="file" name="navtec_report" id="navtecImageInput"
+                                                        class="form-control"
+                                                        accept=".jpg,.png,.jpeg,.gif,.bmp,.tif,.tiff">
+                                                    <div class="text-center pt-3">
+                                                        <img style="height:180px; border:1px solid #dee2e6; border-radius:10px; object-fit:cover;"
+                                                            id="navtecPreview"
+                                                            src="{{ isset($attachments) && $attachments->navtec_report ? asset('storage/candidates/'.$attachments->navtec_report) : asset('images/candidates/img1.jpg') }}"
+                                                            alt="navtec">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-12 mt-2">
+                                            <button type="submit" class="btn btn-primary px-4">
+                                                {{ isset($attachments) ? __('Update Documents') : __('Upload Documents') }}
+                                            </button>
+                                        </div>
+
+                                    </div>{{-- /row --}}
+                                </form>
+                    </div></div>
+            </div>
+        </div>
+    </div>
+
+    {{-- OCR Results Modal --}}
+    <div class="modal fade" id="ocrModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🛂 {{ __('Passport OCR — Extracted Data') }}</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="ocrModalBody">
+                    <p class="text-muted">{{ __('Scanning passport, please wait…') }}</p>
+                </div>
+                <div class="modal-footer" id="ocrModalFooter" style="display:none;">
+                    <button class="btn btn-success" onclick="applyOcrFields()">✅ {{ __('Apply & Save') }}</button>
+                    <button class="btn btn-secondary" data-dismiss="modal">{{ __('Dismiss') }}</button>
                 </div>
             </div>
         </div>
     </div>
-    </div>
-
 
 @endsection
 
-
 @section('frontend_links')
     <link rel="stylesheet" href="{{ asset('frontend') }}/assets/css/bootstrap-datepicker.min.css">
-    <!-- >=>Leaflet Map<=< -->
     <x-map.leaflet.map_links />
     <x-map.leaflet.autocomplete_links />
     @include('map::links')
     <style>
-        .ck-editor__editable_inline {
-            min-height: 300px;
-        }
-
-        .w-100-percent {
-            width: 100% !important;
-        }
-
-        #jobrole #basic-addon1 {
-            width: 50px !important;
-            margin-left: 28px !important;
-        }
-
-        .border-cutom {
-            border-radius: 5px 0 0 5px !important;
-        }
-
-        .input-group-text-custom {
-            max-height: 48px;
-            padding: 12px;
-            background-color: #e9ecef;
-            border-radius: 0 5px 5px 0;
-        }
-
-        .has-badge-cutom {
-            top: 34% !important;
-        }
-
-        .mymap {
-            border-radius: 12px;
-            z-index: 999;
-        }
-
-        @media (max-width: 768px) {
-            .btn {
-                line-height: 18px !important;
-                padding: 10px 10px 10px !important;
-                border-radius: 4px !important;
-                font-size: 12px !important;
-
-            }
-        }
-
-        .slider {
-            width: 100%;
-            margin: 20px 0;
-        }
-
-        .salary-display {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #333;
-        }
+        .ck-editor__editable_inline { min-height: 300px; }
+        .ocr-field-row td { vertical-align: middle; }
+        .conflict-row { background: #fff3cd; }
     </style>
 @endsection
 
 @section('frontend_scripts')
     @livewireScripts
 
-
-
     <script>
-        // Function to display image preview for a given input and image element
-        function previewImage(input, imageElementId) {
-            const file = input.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById(imageElementId).src = e.target.result;
-                };
-                reader.readAsDataURL(file);
+    /* ── Image preview helper ─────────────────────────────────────── */
+    function previewImage(input, previewId) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => document.getElementById(previewId).src = e.target.result;
+        reader.readAsDataURL(file);
+    }
+
+    document.getElementById('passportImageInput').addEventListener('change', function() {
+        previewImage(this, 'passportImagePreview');
+    });
+    document.getElementById('cnicFrontImageInput').addEventListener('change', function() {
+        previewImage(this, 'cnicFrontPreview');
+    });
+    document.getElementById('cnicBackImageInput').addEventListener('change', function() {
+        previewImage(this, 'cnicBackPreview');
+    });
+    document.getElementById('pPCImageInput').addEventListener('change', function() {
+        previewImage(this, 'pPCPreview');
+    });
+    document.getElementById('medicalImageInput').addEventListener('change', function() {
+        previewImage(this, 'medicalPreview');
+    });
+    document.getElementById('navtecImageInput').addEventListener('change', function() {
+        previewImage(this, 'navtecPreview');
+    });
+
+    /* ── OCR Trigger (new file selected) ──────────────────────────── */
+    let ocrData = null;
+    let ocrConflicts = {};
+
+    function triggerPassportOCR() {
+        const fileInput = document.getElementById('passportImageInput');
+        if (!fileInput.files.length) {
+            alert('{{ __("Please select a passport image first.") }}');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('passport', fileInput.files[0]);
+        formData.append('_token', '{{ csrf_token() }}');
+        runOCR(formData);
+    }
+
+    function scanExistingPassport(imgUrl) {
+        // When re-scanning an already-saved image we need to fetch it as a Blob
+        const status = document.getElementById('ocrStatus');
+        status.style.display = 'block';
+        status.textContent = '{{ __("Fetching saved image for re-scan…") }}';
+
+        fetch(imgUrl)
+            .then(r => r.blob())
+            .then(blob => {
+                const formData = new FormData();
+                formData.append('passport', blob, 'passport.jpg');
+                formData.append('_token', '{{ csrf_token() }}');
+                runOCR(formData);
+            })
+            .catch(() => {
+                status.textContent = '{{ __("Could not fetch image.") }}';
+            });
+    }
+
+    function runOCR(formData) {
+        const status   = document.getElementById('ocrStatus');
+        const $modal   = $('#ocrModal');
+        const body     = document.getElementById('ocrModalBody');
+        const footer   = document.getElementById('ocrModalFooter');
+
+        status.style.display = 'block';
+        status.textContent   = '⏳ {{ __("Scanning — please wait…") }}';
+        body.innerHTML       = '<div class="text-center py-4"><div class="spinner-border text-primary"></div><p class="mt-2">{{ __("Processing OCR…") }}</p></div>';
+        footer.style.display = 'none';
+        ocrData              = null;
+        ocrConflicts         = {};
+        $modal.modal('show');
+
+        fetch('{{ route("ai.parse.passport") }}', {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+            body: formData
+        })
+        .then(r => r.json())
+        .then(json => {
+            status.style.display = 'none';
+            if (json.error) {
+                body.innerHTML = `<div class="alert alert-danger">${json.error}</div>`;
+                return;
             }
+            ocrData = json.extracted;
+            ocrConflicts = json.conflicts || {};
+            if (json.attachment_url) {
+                document.getElementById('passportImagePreview').src = json.attachment_url;
+            }
+            body.innerHTML = buildOcrTable(json.extracted, json.conflicts || {});
+            footer.style.display = '';
+        })
+        .catch(err => {
+            body.innerHTML = `<div class="alert alert-danger">{{ __("OCR request failed.") }} ${err}</div>`;
+            status.style.display = 'none';
+        });
+    }
+
+    function buildOcrTable(extracted, conflicts) {
+        const labels = {
+            full_name:       '{{ __("Full Name") }}',
+            surname:         '{{ __("Surname") }}',
+            given_names:     '{{ __("Given Names") }}',
+            nationality:     '{{ __("Nationality") }}',
+            date_of_birth:   '{{ __("Date of Birth") }}',
+            gender:          '{{ __("Gender") }}',
+            place_of_birth:  '{{ __("Place of Birth") }}',
+            date_of_issue:   '{{ __("Date of Issue") }}',
+            date_of_expiry:  '{{ __("Date of Expiry") }}',
+            place_of_issue:  '{{ __("Place of Issue") }}',
+            passport_number: '{{ __("Passport Number") }}',
+            mrz_line1:       'MRZ Line 1',
+            mrz_line2:       'MRZ Line 2',
+        };
+
+        let rows = '';
+        for (const [key, label] of Object.entries(labels)) {
+            const val     = extracted[key] ?? '—';
+            const conflict = conflicts[key];
+            const rowClass = conflict ? 'class="conflict-row"' : '';
+            const badge    = conflict ? `<span class="badge bg-warning text-dark ms-1">⚠️ {{ __("Conflict") }}</span>` : '';
+            const dbVal    = conflict ? `<small class="text-muted d-block">{{ __("DB") }}: ${conflict.db}</small>` : '';
+            rows += `<tr ${rowClass}>
+                <td class="fw-semibold">${label}${badge}</td>
+                <td><code>${val}</code>${dbVal}</td>
+            </tr>`;
         }
 
-        // Add event listeners for image preview
-        document.getElementById('passportImageInput').addEventListener('change', function() {
-            previewImage(this, 'passportImagePreview');
-        });
+        const conflictAlert = Object.keys(conflicts).length > 0
+            ? `<div class="alert alert-warning">⚠️ {{ __("Conflicts detected — admin will review before applying.") }}</div>`
+            : '';
 
-        document.getElementById('cnicFrontImageInput').addEventListener('change', function() {
-            previewImage(this, 'cnicFrontPreview');
-        });
-        document.getElementById('cnicBackImageInput').addEventListener('change', function() {
-            previewImage(this, 'cnicBackPreview');
-        });
+        return `${conflictAlert}
+        <table class="table table-sm table-bordered">
+            <thead><tr><th>{{ __("Field") }}</th><th>{{ __("OCR Value") }}</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <p class="small text-muted">{{ __("Click Apply & Save to queue this for admin review and profile update.") }}</p>`;
+    }
 
-        document.getElementById('pPCImageInput').addEventListener('change', function() {
-            previewImage(this, 'pPCPreview');
-        }); document.getElementById('medicalImageInput').addEventListener('change', function() {
-            previewImage(this, 'medicalPreview');
-        }); document.getElementById('navtecImageInput').addEventListener('change', function() {
-            previewImage(this, 'navtecPreview');
-        });
+    function applyOcrFields() {
+        $('#ocrModal').modal('hide');
+        const hasConflicts = ocrConflicts && Object.keys(ocrConflicts).length > 0;
+        alert(hasConflicts
+            ? '{{ __("OCR data saved for admin review. Your profile will be updated once confirmed.") }}'
+            : '{{ __("Passport data applied to your profile successfully.") }}');
+    }
     </script>
-
-
-
-
-
-    <!-- =============== google map ========= -->
 
 @endsection

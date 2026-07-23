@@ -1,0 +1,25 @@
+<?php
+
+namespace App\View\Components\Website\Agency;
+
+use Illuminate\View\Component;
+
+class NotificationsComponent extends Component
+{
+    /**
+     * Create a new component instance.
+     *
+     * @return void
+     */
+    public function __construct() {}
+
+    /**
+     * Get the view / contents that represent the component.
+     *
+     * @return \Illuminate\Contracts\View\View|\Closure|string
+     */
+    public function render()
+    {
+        return view('components.website.agency.notifications-component');
+    }
+}

@@ -2434,5 +2434,6 @@
         }
     </script>
 
+    @include('frontend.partials.register-type-modal')
 
 </header>

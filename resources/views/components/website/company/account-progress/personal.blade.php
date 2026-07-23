@@ -1,4 +1,4 @@
-@props(['user'])
+@props(['user', 'longForm' => false])
 
 <form action="{{ route('company.profile.complete', auth()->user()->id) }}" method="post" enctype="multipart/form-data">
     @method('PUT')
@@ -17,7 +17,9 @@
         <div class="form-card">
             <div class="personal-profile-picture-wrap">
                 <div class="company-logo-banner-info">
+                    @unless($longForm)
                     <h6>{{ __('logo_banner_image') }}</h6>
+                    @endunless
                     <div class="row">
                          <x-website.company.photo-section :user="$user" />
                         <x-website.company.banner-section :user="$user" />
@@ -26,7 +28,9 @@
             </div>
 
             <div class="dashboard-account-setting-item">
+                @unless($longForm)
                 <h6>{{ __('company_information') }}</h6>
+                @endunless
                 <div class="row">
                     <div class="col-12 mb-3">
                         <label class="pointer body-font-4 d-block text-gray-900 rt-mb-8">
@@ -62,8 +66,8 @@
                 </div>
             </div>
         </div>
-        <button type="submit" class="btn next btn-primary">
-            {{ __('save_next') }}
+        <button type="submit" class="btn btn-primary">
+            {{ $longForm ? __('save') : __('save_next') }}
         </button>
     </fieldset>
 </form>

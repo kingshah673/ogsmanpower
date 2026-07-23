@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\CandidateJobsController;
 use App\Http\Controllers\Api\CloudMessageController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CompanyJobsController;
+use App\Http\Controllers\Api\AgencyController;
+use App\Http\Controllers\Api\AgencyJobsController;
 use App\Http\Controllers\Api\LocalizationController;
 use App\Http\Controllers\Api\SocialAuthController;
 use App\Http\Controllers\Api\WebsiteController;
@@ -163,6 +165,46 @@ Route::middleware(['auth:sanctum', 'api_company', 'api_has_plan'])->prefix('comp
     });
 
     Route::controller(CompanyJobsController::class)->prefix('job')->group(function () {
+        Route::get('/', 'getJobs');
+        Route::get('/{id}/applications', 'applications');
+        Route::post('/applications/{id}/group-update', 'applicationGroupUpdate');
+        Route::get('/download-cv/{id}', 'downloadCv');
+    });
+
+});
+
+//  agency Apis
+Route::middleware(['auth:sanctum', 'api_agency', 'api_has_plan'])->prefix('agency')->group(function () {
+    //  agency Dashboard Apis
+    Route::controller(AgencyController::class)->group(function () {
+        Route::get('/dashboard', 'dashboard')->withoutMiddleware('api_has_plan');
+        Route::get('/plan', 'plan')->withoutMiddleware('api_has_plan');
+        Route::get('/plan-limit', 'planLimit')->withoutMiddleware('api_has_plan');
+        Route::post('/bookmark/candidate', 'bookmarkCandidate');
+        Route::get('/bookmark/candidates', 'fetchBookmarkCandidates');
+        Route::get('/bookmark/categories', 'fetchBookmarkCategories');
+        Route::post('/bookmark/categories', 'storeBookmarkCategories');
+        Route::get('/bookmark/categories/{category}/edit', 'editBookmarkCategories');
+        Route::put('/bookmark/categories/{category}', 'updateBookmarkCategories');
+        Route::delete('/bookmark/categories/{category}', 'deleteBookmarkCategories');
+        Route::get('/create/job', 'createJob');
+        Route::post('/store/job', 'storeJob');
+        Route::get('/edit/{job:slug}/job', 'editJob');
+        Route::put('/update/{job:slug}/job', 'updateJob');
+        Route::post('/promote/job', 'promoteJob');
+        Route::post('/clone/job', 'cloneJob');
+        Route::post('/change-status/job', 'changeJobStatus');
+        Route::get('/application/group', 'fetchApplicationGroup');
+        Route::post('/application/group', 'storeApplicationGroup');
+        Route::put('/application/group/{group}', 'updateApplicationGroup');
+        Route::delete('/application/group/{group}', 'deleteApplicationGroup');
+        Route::get('/account-progress', 'fetchAccountProgress')->withoutMiddleware('api_has_plan');
+        Route::post('/account-progress', 'submitAccountProgress')->withoutMiddleware('api_has_plan');
+        Route::get('/download-invoice/{id}', 'downloadInvoice');
+        Route::get('/social-links', 'getSocialLinks')->withoutMiddleware('api_has_plan');
+    });
+
+    Route::controller(AgencyJobsController::class)->prefix('job')->group(function () {
         Route::get('/', 'getJobs');
         Route::get('/{id}/applications', 'applications');
         Route::post('/applications/{id}/group-update', 'applicationGroupUpdate');

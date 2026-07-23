@@ -120,11 +120,13 @@ class PayPerJobService
             'featured_until' => $featured_days,
             'highlight_until' => $highlight_days,
             'is_remote' => $request->is_remote ?? 0,
-            'status' => setting('job_auto_approved') ? 'active' : 'pending',
+            'status' => initialJobStatus(),
+            'job_roles' => 'public',
         ]);
 
         // Location
         updateMap($jobCreated);
+        finalizeJobForListing($jobCreated);
 
         // Benefits
         $benefits = $request->benefits ?? null;

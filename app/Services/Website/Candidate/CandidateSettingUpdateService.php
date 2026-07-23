@@ -9,6 +9,7 @@ use App\Models\Education;
 use App\Models\Experience;
 use App\Models\Profession;
 use App\Models\ProfessionTranslation;
+use App\Models\SearchCountry;
 use App\Models\Setting;
 use App\Models\Skill;
 use App\Models\SkillTranslation;
@@ -17,6 +18,7 @@ use App\Models\Attachment;
 use App\Models\CandidateAttribute;
 use App\Models\CandidateDocument;
 use App\Models\JobRequirement;
+use App\Services\DynamicFieldService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -33,131 +35,101 @@ class CandidateSettingUpdateService
      */
     public function update($request)
     {
-
-
         $user = User::FindOrFail(auth()->id());
         $candidate = Candidate::where('user_id', $user->id)->first();
         $contactInfo = ContactInfo::where('user_id', auth()->id())->first();
         $request->session()->put('type', $request->type);
 
         if ($request->type == 'basic') {
-            // dd($request->all());
             $this->candidateBasicInfoUpdate($request, $user, $candidate);
-            $candidate->update(['profile_complete' => $candidate->profile_complete != 0 ? $candidate->profile_complete - 25 : 0]);
-            flashSuccess(__('profile_updated'));
 
-            return back();
+            return $this->respond($request, __('profile_updated'), $candidate, 'basic');
         }
         if ($request->type == 'jobRequirements') {
-            // dd($request->all());
-
             $this->jobRequirments($request, $candidate);
-            flashSuccess(__('profile_updated'));
 
-            return back();
+            return $this->respond($request, __('profile_updated'), $candidate, 'jobRequirements');
         }
         if ($request->type == 'summary') {
             $this->candidateSummaryUpdate($request, $user, $candidate);
-            flashSuccess(__('Summary Updated'));
 
-            return back();
+            return $this->respond($request, __('Summary Updated'), $candidate, 'summary');
         }
 
         if ($request->type == 'skill') {
             $this->candidateSkillUpdate($request, $candidate);
-            flashSuccess(__('Skills Updated'));
-            return back();
+
+            return $this->respond($request, __('Skills Updated'), $candidate, 'skill');
         }
 
         if ($request->type == 'language') {
             $this->candidateLanguageUpdate($request, $candidate);
-            flashSuccess(__('Languages Updated'));
-            return back();
+
+            return $this->respond($request, __('Languages Updated'), $candidate, 'language');
         }
 
         if ($request->type == 'profile') {
             $this->candidateProfileInfoUpdate($request, $candidate);
-            $candidate->update(['profile_complete' => $candidate->profile_complete != 0 ? $candidate->profile_complete - 25 : 0]);
-            flashSuccess(__('profile_updated'));
 
-            return back();
+            return $this->respond($request, __('profile_updated'), $candidate, 'profile');
         }
 
         if ($request->type == 'social') {
             $this->socialUpdate($request);
-            $candidate->update(['profile_complete' => $candidate->profile_complete != 0 ? $candidate->profile_complete - 25 : 0]);
-            flashSuccess(__('profile_updated'));
 
-            return back();
+            return $this->respond($request, __('profile_updated'), $candidate, 'social');
         }
 
         if ($request->type == 'contact') {
             $this->contactUpdate($request, $candidate);
-            $candidate->update(['profile_complete' => $candidate->profile_complete != 0 ? $candidate->profile_complete - 25 : 0]);
-            flashSuccess(__('profile_updated'));
 
-            return back();
+            return $this->respond($request, __('profile_updated'), $candidate, 'contact');
         }
 
         if ($request->type == 'account') {
+            $sent = $this->emailUpdate($request);
+            $message = $sent ? __('Mail Verification Sent') : __('profile_updated');
 
-            $this->emailUpdate($request) ? flashSuccess(__('Mail Verification Sent')) : flashSuccess(__('profile_updated'));
-
-            return back();
+            return $this->respond($request, $message, $candidate, 'account');
         }
-
-
-        if ($request->type == 'skill') {
-
-            $this->emailUpdate($request) ? flashSuccess(__('Mail Verification Sent')) : flashSuccess(__('profile_updated'));
-
-            return back();
-        }
-        if ($request->type == 'language') {
-
-            $this->emailUpdate($request) ? flashSuccess(__('Mail Verification Sent')) : flashSuccess(__('profile_updated'));
-
-            return back();
-        }
-
 
         if ($request->type == 'attachments') {
-            // Call the attachment update function here
             $this->attachmentUpdate($request);
-            flashSuccess(__('Attachments updated successfully'));
-            return back();
+
+            return $this->respond($request, __('Attachments updated successfully'), $candidate, 'attachments');
         }
 
         if ($request->type == 'alert') {
             $this->alertUpdate($request, $candidate);
-            flashSuccess(__('profile_updated'));
 
-            return back();
+            return $this->respond($request, __('profile_updated'), $candidate, 'alert');
         }
 
         if ($request->type == 'visibility') {
             $this->visibilityUpdate($request, $candidate);
-            flashSuccess(__('profile_updated'));
 
-            return back();
+            return $this->respond($request, __('profile_updated'), $candidate, 'visibility');
         }
 
         if ($request->type == 'password') {
             $this->passwordUpdate($request, $user, $candidate);
-            flashSuccess(__('profile_updated'));
 
-            return back();
+            return $this->respond($request, __('profile_updated'), $candidate, 'password');
         }
 
         if ($request->type == 'account-delete') {
             $this->accountDelete($user);
+
+            return $this->respond($request, __('profile_updated'), $candidate, 'account-delete');
         }
 
         if ($request->type == 'documents') {
             $this->documentUpdate($request);
-            flashSuccess(__('Document Updated Successfully'));
-            return back();
+
+            return $this->respond($request, __('Document Updated Successfully'), $candidate, 'documents');
         }
+
+        return $this->respond($request, __('profile_updated'), $candidate, $request->type);
     }
 
     /**
@@ -168,12 +140,41 @@ class CandidateSettingUpdateService
      * @param  \App\Models\Candidate  $candidate
      * @return \Illuminate\Http\Response
      */
+    /**
+     * Normalise a user-supplied date (dd-mm-yyyy from the picker, or other
+     * common formats) to MySQL's Y-m-d. Returns null for empty/unparseable
+     * values so nullable date columns stay null instead of erroring.
+     */
+    private function toDbDate($value): ?string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y-m-d H:i:s', 'm/d/Y'] as $fmt) {
+            try {
+                $d = Carbon::createFromFormat($fmt, $value);
+                if ($d !== false) {
+                    return $d->format('Y-m-d');
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        try {
+            return Carbon::parse($value)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
     public function candidateBasicInfoUpdate($request, $user, $candidate)
     {
 
         $request->validate([
             // 'name' => 'required',
-            'birth_date' => 'date',
+            'birth_date' => 'nullable|date',
             'education' => 'required',
             'experience' => 'required',
             'gender' => 'required',
@@ -203,10 +204,13 @@ class CandidateSettingUpdateService
             $education = Education::create(['name' => $education_request]);
         }
 
-        $dateTime = Carbon::parse($request->birth_date);
-        $date = $request['birth_date'] = $dateTime->format('Y-m-d H:i:s');
+        $date = null;
+        if ($request->filled('birth_date')) {
+            $dateTime = Carbon::parse($request->birth_date);
+            $date = $dateTime->format('Y-m-d H:i:s');
+        }
 
-        if ($request->custom_title !== null) {
+        if ($request->custom_title !== null && $request->custom_title !== '') {
             $title = $request->custom_title;
         } else {
             $title = $request->title;
@@ -236,7 +240,32 @@ class CandidateSettingUpdateService
         }
 
 
-        $candidate->update([
+        // Passport dates arrive from the date-picker as dd-mm-yyyy; the columns
+        // are MySQL DATE (Y-m-d). Convert them or MySQL throws SQLSTATE[22007]
+        // and the whole save (including the profile photo) is aborted.
+        $passportIssueDate  = $this->toDbDate($request->passport_issue_date);
+        $passportExpiryDate = $this->toDbDate($request->passport_expiry_date);
+
+        $locationUpdate = [];
+        if ($request->has('country')) {
+            $locationUpdate['country'] = $request->country ?: null;
+            if ($request->filled('country')) {
+                $searchCountry = SearchCountry::where('name', $request->country)->first();
+                if ($searchCountry) {
+                    $locationUpdate['search_country_id'] = $searchCountry->id;
+                }
+            } else {
+                $locationUpdate['search_country_id'] = null;
+            }
+        }
+        if ($request->has('state')) {
+            $locationUpdate['region'] = $request->state ?: null;
+        }
+        if ($request->has('district')) {
+            $locationUpdate['district'] = $request->district ?: null;
+        }
+
+        $candidate->update(array_merge([
             'title' => $title,
             'experience_id' => $experience->id,
             'education_id' => $education->id,
@@ -244,16 +273,16 @@ class CandidateSettingUpdateService
             'birth_date' => $date,
             'gender' => $request->gender,
             'marital_status' => $request->marital_status,
-           
+
             'profession_id' => $profession_id,
             'status' => $request->status,
             'available_in' => $request->available_in ? Carbon::parse($request->available_in)->format('Y-m-d') : null,
             'passport_number' => $request->passport_number,
-            'passport_issue_date' => $request->passport_issue_date,
-            'passport_expiry_date' => $request->passport_expiry_date,
+            'passport_issue_date' => $passportIssueDate,
+            'passport_expiry_date' => $passportExpiryDate,
             'place_of_issue' => $request->place_of_issue,
             'cnic_number' => $request->cnic_number,
-        ]);
+        ], $locationUpdate));
 
         // image
         if ($request->image) {
@@ -284,50 +313,64 @@ class CandidateSettingUpdateService
                 'cv' => $pdf,
             ]);
         }
-        if ($request->input('dynamic_inputs') != '' && $request->input('dynamic_inputs') != Null) {
+        // Dynamic field values saved centrally in respond() via DynamicFieldService.
 
-            foreach ($request->input('dynamic_inputs') as $inputData) {
-
-                $dynamicInput = CandidateAttribute::find($inputData['id']);
-
-                if ($dynamicInput) {
-                    $dynamicInput->attribute_value = $inputData['value']; // Update the value
-                    $dynamicInput->save(); // Save the changes
-                }
-            }
+        // Map module writes geo fields from session; skip when the settings page
+        // uses the country/state/city dropdowns (map_show off) — otherwise updateMap
+        // overwrites the location we just saved with empty session placeholders.
+        if (config('templatecookie.map_show')) {
+            updateMap(auth()->user()->candidate);
         }
-        updateMap(auth()->user()->candidate);
+
         return true;
     }
 
 
     public function jobRequirments($request, $candidate)
     {
-        // dd($request->all());
+        $jobs = cw_normalize_multi_input($request, 'jobs', 'jobs_payload');
+        $industries = cw_normalize_multi_input($request, 'industries', 'industries_payload');
+        $request->merge(['jobs' => $jobs, 'industries' => $industries]);
+
         $request->validate([
-            'jobs' => 'required|array',
-            'industries' => 'required|array',
+            'jobs' => 'required|array|min:1',
+            'industries' => 'required|array|min:1',
             'region' => 'required|string',
             'currency' => 'required|string',
             'salary' => 'required|numeric|min:0',
-            'country' => 'required|integer',
-            'state' => 'nullable|integer',
-            'district' => 'nullable|integer',
+            'country' => 'required',
+            'state' => 'nullable',
+            'district' => 'nullable',
         ]);
+
+        $searchCountryId = null;
+        $stateId = null;
+        $cityId = null;
+
+        if ($request->country !== 'anywhere') {
+            $request->validate([
+                'country' => 'integer|exists:search_countries,id',
+                'state' => 'nullable|integer',
+                'district' => 'nullable|integer',
+            ]);
+            $searchCountryId = (int) $request->country;
+            $stateId = $request->filled('state') ? (int) $request->state : null;
+            $cityId = $request->filled('district') ? (int) $request->district : null;
+        }
 
         $candidate = auth()->user()->candidate;
 
         JobRequirement::updateOrCreate(
-            ['candidate_id' => $candidate->id], // Search condition
+            ['candidate_id' => $candidate->id],
             [
-                'jobs' => json_encode($request->jobs), // Store as JSON
-                'industries' => json_encode($request->industries),
-                'region' => $request->region,
-                'currency' => $request->currency,
-                'salary' => $request->salary,
-                'search_country_id' => $request->country,
-                'state_id' => $request->state,
-                'city_id' => $request->district,
+                'jobs'              => cw_resolve_profession_ids($jobs),
+                'industries'        => cw_resolve_industry_ids($industries),
+                'region'            => $request->region,
+                'currency'          => $request->currency,
+                'salary'            => $request->salary,
+                'search_country_id' => $searchCountryId,
+                'state_id'          => $stateId,
+                'city_id'           => $cityId,
             ]
         );
         return true;
@@ -526,7 +569,7 @@ class CandidateSettingUpdateService
             ]);
         }
 
-        if (! empty($request->whatsapp_number)) {
+        if ($request->has('whatsapp_number')) {
             $candidate->update(['whatsapp_number' => $request->whatsapp_number]);
         }
 
@@ -607,8 +650,13 @@ class CandidateSettingUpdateService
             'license_image'  => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
 
-        // Get the authenticated candidate
-        $candidate = Candidate::findOrFail(auth()->user()->candidate->id);
+        $user = authUser();
+
+        if (! $user?->candidate) {
+            abort(404);
+        }
+
+        $candidate = $user->candidate;
 
         // Fetch the candidate's existing attachment or create a new one if it doesn't exist
         $attachment = Attachment::where('candidate_id', $candidate->id)->firstOrNew();
@@ -647,89 +695,53 @@ class CandidateSettingUpdateService
     }
     public function documentUpdate($request)
     {
-        // Validate request input
+        $allowedMimes = 'nullable|file|mimes:jpeg,jpg,png,gif,bmp,tiff|max:5120';
+
         $request->validate([
-            'passport_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'license_image'  => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'passport_image'              => $allowedMimes,
+            'cnic_front'                  => $allowedMimes,
+            'cnic_back'                   => $allowedMimes,
+            'police_character_certificate'=> $allowedMimes,
+            'medical'                     => $allowedMimes,
+            'navtec_report'               => $allowedMimes,
+            'license_image'               => $allowedMimes,
         ]);
 
-        // Get the authenticated candidate
-        $candidate = Candidate::findOrFail(auth()->user()->candidate->id);
+        $user = authUser();
 
-        // Fetch the candidate's existing attachment or create a new one if it doesn't exist
-        $document = CandidateDocument::where('candidate_id', $candidate->id)->firstOrNew();
-
-        // Handle passport image upload
-        if ($request->hasFile('passport_image')) {
-            // Delete old passport image if it exists
-            if ($document->passport_image) {
-                Storage::delete('public/candidates/' . $document->passport_image);
-            }
-
-            // Store new passport image
-            $passportImagePath = $request->file('passport_image')->store('public/candidates');
-            $document->passport_image = basename($passportImagePath);
+        if (! $user?->candidate) {
+            abort(404);
         }
 
-
-        if ($request->hasFile('cnic_front')) {
-
-            if ($document->cnic_front) {
-                Storage::delete('public/candidates/' . $document->cnic_front);
-            }
-
-
-            $cnicFrontPath = $request->file('cnic_front')->store('public/candidates');
-            $document->cnic_front = basename($cnicFrontPath);
-        }
-
-        if ($request->hasFile('cnic_back')) {
-
-            if ($document->cnic_back) {
-                Storage::delete('public/candidates/' . $document->cnic_back);
-            }
-
-
-            $cnicBackPath = $request->file('cnic_back')->store('public/candidates');
-            $document->cnic_back = basename($cnicBackPath);
-        }
-
-        if ($request->hasFile('police_character_certificate')) {
-
-            if ($document->police_character_certificate) {
-                Storage::delete('public/candidates/' . $document->police_character_certificate);
-            }
-
-
-            $policeCertificatePath = $request->file('police_character_certificate')->store('public/candidates');
-            $document->police_character_certificate = basename($policeCertificatePath);
-        }
-
-        if ($request->hasFile('medical')) {
-
-            if ($document->medical) {
-                Storage::delete('public/candidates/' . $document->medical);
-            }
-
-
-            $medicalImagePath = $request->file('medical')->store('public/candidates');
-            $document->medical = basename($medicalImagePath);
-        }
-        if ($request->hasFile('navtec_report')) {
-
-            if ($document->navtec_report) {
-                Storage::delete('public/candidates/' . $document->navtec_report);
-            }
-
-
-            $navtecImagePath = $request->file('navtec_report')->store('public/candidates');
-            $document->navtec_report = basename($navtecImagePath);
-        }
-
-        // Set the candidate_id on the document if it's a new record
+        $candidate = $user->candidate;
         $document->candidate_id = $candidate->id;
 
-        // Save the document (insert or update)
+        $fields = [
+            'passport_image',
+            'cnic_front',
+            'cnic_back',
+            'police_character_certificate',
+            'medical',
+            'navtec_report',
+            'license_image',
+        ];
+
+        foreach ($fields as $field) {
+            if ($request->hasFile($field)) {
+                $mime = $request->file($field)->getMimeType();
+                if (! in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff'])) {
+                    continue;
+                }
+
+                if ($document->{$field}) {
+                    deleteImage(public_path('storage/candidates/' . $document->{$field}));
+                }
+
+                $relativePath = uploadImage($request->file($field), 'storage/candidates');
+                $document->{$field} = basename($relativePath);
+            }
+        }
+
         $document->save();
 
         return true;
@@ -823,5 +835,103 @@ class CandidateSettingUpdateService
         }
 
         return true;
+    }
+
+    private function wantsJsonResponse($request): bool
+    {
+        return $request->expectsJson()
+            || $request->wantsJson()
+            || $request->ajax()
+            || $request->header('X-Requested-With') === 'XMLHttpRequest';
+    }
+
+    private function completionPayload(Candidate $candidate): array
+    {
+        $candidate->refresh();
+
+        return [
+            'completionPercentage' => $candidate->calculateProfileCompletion(),
+            'profileCompletionMissing' => array_map(static fn ($section) => [
+                'key' => $section['key'],
+                'label' => $section['label'],
+                'hint' => $section['hint'],
+                'anchor' => $section['anchor'],
+            ], $candidate->profileCompletionMissing()),
+        ];
+    }
+
+    private function sectionPayload(string $type, Candidate $candidate, User $user): array
+    {
+        $candidate->refresh();
+        $user->refresh();
+
+        return match ($type) {
+            'basic' => [
+                'preview' => [
+                    'full_name' => $user->name,
+                    'email' => $user->email,
+                    'whatsapp' => $candidate->whatsapp_number ?? $user->whatsapp,
+                    'location' => collect([
+                        $candidate->district,
+                        $candidate->region,
+                        $candidate->basicLocationCountry(),
+                    ])->filter()->implode(', '),
+                ],
+            ],
+            'summary' => [
+                'preview' => ['bio' => $candidate->bio],
+            ],
+            'skill' => [
+                'preview' => [
+                    'skills' => $candidate->skills()->get()->map(fn ($s) => $s->name)->values()->all(),
+                ],
+            ],
+            'language' => [
+                'preview' => [
+                    'languages' => $candidate->languages()->get()->map(fn ($l) => $l->name)->values()->all(),
+                ],
+            ],
+            'contact' => [
+                'preview' => [
+                    'phone' => optional(ContactInfo::where('user_id', $user->id)->first())->phone,
+                    'secondary_phone' => optional(ContactInfo::where('user_id', $user->id)->first())->secondary_phone,
+                    'whatsapp' => $candidate->whatsapp_number,
+                    'email' => optional(ContactInfo::where('user_id', $user->id)->first())->email,
+                ],
+            ],
+            'visibility' => [
+                'preview' => [
+                    'visibility' => (bool) $candidate->visibility,
+                    'cv_visibility' => (bool) $candidate->cv_visibility,
+                ],
+            ],
+            'alert' => [
+                'preview' => [
+                    'received_job_alert' => (bool) $candidate->received_job_alert,
+                ],
+            ],
+            default => [],
+        };
+    }
+
+    private function respond($request, string $message, Candidate $candidate, string $type)
+    {
+        if ($request->has('dynamic_inputs') && is_array($request->input('dynamic_inputs'))) {
+            DynamicFieldService::saveSeekerFieldValues($candidate, $request->input('dynamic_inputs'));
+        }
+
+        if ($this->wantsJsonResponse($request)) {
+            $user = $request->user();
+
+            return response()->json(array_merge([
+                'success' => true,
+                'message' => $message,
+                'type' => $type,
+            ], $this->completionPayload($candidate), $this->sectionPayload($type, $candidate, $user)));
+        }
+
+        flashSuccess($message);
+
+        return back();
     }
 }

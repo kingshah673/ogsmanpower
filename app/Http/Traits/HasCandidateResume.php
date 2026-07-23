@@ -30,6 +30,22 @@ trait HasCandidateResume
 
         CandidateResume::create($data);
 
+        if ($request->expectsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+            $resume = CandidateResume::where('candidate_id', $candidate->id)->latest('id')->first();
+
+            return response()->json([
+                'success' => true,
+                'message' => __('resume_added_successfully'),
+                'item' => $resume ? [
+                    'id' => $resume->id,
+                    'name' => $resume->name,
+                    'file' => $resume->file,
+                ] : null,
+                'action' => 'create',
+                'resource' => 'resume',
+            ]);
+        }
+
         return back()->with('success', 'Resume added successfully');
     }
 
@@ -105,6 +121,20 @@ trait HasCandidateResume
 
         $resume->update($data);
 
+        if ($request->expectsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Resume updated successfully',
+                'item' => [
+                    'id' => $resume->id,
+                    'name' => $resume->name,
+                    'file' => $resume->file,
+                ],
+                'action' => 'update',
+                'resource' => 'resume',
+            ]);
+        }
+
         return back()->with('success', 'Resume updated successfully');
     }
 
@@ -113,10 +143,21 @@ trait HasCandidateResume
      *
      * @return \Illuminate\Http\Response
      */
-    public function resumeDelete(CandidateResume $resume)
+    public function resumeDelete(Request $request, CandidateResume $resume)
     {
         deleteFile($resume->file);
+        $id = $resume->id;
         $resume->delete();
+
+        if ($request->expectsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Resume deleted successfully',
+                'id' => $id,
+                'action' => 'delete',
+                'resource' => 'resume',
+            ]);
+        }
 
         return back()->with('success', 'Resume deleted successfully');
     }
@@ -139,6 +180,8 @@ trait HasCandidateResume
             abort(403);
         }
 
-        return response()->file($cv->file);
+        $fullPath = storage_path('app/public/' . ltrim($cv->file, '/'));
+        abort_if(!file_exists($fullPath), 404);
+        return response()->file($fullPath);
     }
 }

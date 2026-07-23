@@ -141,9 +141,12 @@ class CandidateJobsController extends Controller
         DB::table('applied_jobs')->insert([
             'candidate_id' => $candidate->id,
             'job_id' => $job->id,
+            'company_id' => $job->company_id ?: null,
+            'agency_id' => $job->agency_id ?: null,
             'cover_letter' => $request->cover_letter,
             'candidate_resume_id' => $request->resume_id,
             'application_group_id' => $job->company->applicationGroups->where('is_deleteable', false)->first()->id ?? 1,
+            'status' => 'pending',
             'created_at' => now(),
             'updated_at' => now(),
         ]);

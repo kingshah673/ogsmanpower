@@ -49,6 +49,33 @@ class RolePermissionSeeder extends Seeder
                 ],
             ],
             [
+                'group_name' => 'agency',
+                'permissions' => [
+                    'agency.create',
+                    'agency.view',
+                    'agency.update',
+                    'agency.delete',
+                ],
+            ],
+            [
+                'group_name' => 'agent',
+                'permissions' => [
+                    'agent.create',
+                    'agent.view',
+                    'agent.update',
+                    'agent.delete',
+                ],
+            ],
+            [
+                'group_name' => 'broker',
+                'permissions' => [
+                    'broker.create',
+                    'broker.view',
+                    'broker.update',
+                    'broker.delete',
+                ],
+            ],
+            [
                 'group_name' => 'map',
                 'permissions' => [
                     // company permission

@@ -64,27 +64,65 @@ class CompanyListService
         }
 
         // Industry Type
-        if ($request->has('industry_type') && $request->industry_type !== null) {
-            $industry_type = IndustryTypeTranslation::where('name', $request->industry_type)->first();
-            $query->where('industry_type_id', $industry_type->industry_type_id);
+        if ($request->filled('industry_type')) {
+            $names = array_filter((array) $request->industry_type);
+            if ($names) {
+                $ids = IndustryTypeTranslation::whereIn('name', $names)->pluck('industry_type_id');
+                if ($ids->isNotEmpty()) {
+                    $query->whereIn('industry_type_id', $ids);
+                }
+            }
         }
 
         // Organization Type
-        if ($request->has('organization_type') && $request->organization_type !== null) {
-            $organization_type = OrganizationTypeTranslation::where('name', $request->organization_type)->first();
-            $query->where('organization_type_id', $organization_type->organization_type_id);
+        if ($request->filled('organization_type')) {
+            $names = array_filter((array) $request->organization_type);
+            if ($names) {
+                $ids = OrganizationTypeTranslation::whereIn('name', $names)->pluck('organization_type_id');
+                if ($ids->isNotEmpty()) {
+                    $query->whereIn('organization_type_id', $ids);
+                }
+            }
         }
 
         // Team Size
-        if ($request->has('team_size') && $request->team_size !== null) {
-            $team_size = TeamSize::where('name', $request->team_size)->first();
-            $query->where('team_size_id', $team_size->id);
+        if ($request->filled('team_size')) {
+            $names = array_filter((array) $request->team_size);
+            if ($names) {
+                $ids = TeamSize::whereIn('name', $names)->pluck('id');
+                if ($ids->isNotEmpty()) {
+                    $query->whereIn('team_size_id', $ids);
+                }
+            }
         }
 
         $companies = $query->latest('activejobs')->paginate(12);
 
-        $team_sizes = TeamSize::all(['id']);
-        $industries = IndustryType::all();
+        // Only industries used by active companies (IndustryType::all is ~480 + translations)
+        $industryIds = Company::query()
+            ->active()
+            ->whereNotNull('industry_type_id')
+            ->distinct()
+            ->pluck('industry_type_id');
+
+        $industries = IndustryType::query()
+            ->whereIn('id', $industryIds)
+            ->get()
+            ->sortBy('name');
+
+        // Keep selected industries in the set for chips/labels
+        $selectedNames = array_filter((array) $request->industry_type);
+        if ($selectedNames) {
+            $extra = IndustryTypeTranslation::whereIn('name', $selectedNames)->pluck('industry_type_id');
+            $missing = $extra->diff($industryIds);
+            if ($missing->isNotEmpty()) {
+                $industries = $industries
+                    ->merge(IndustryType::whereIn('id', $missing)->get())
+                    ->sortBy('name');
+            }
+        }
+
+        $team_sizes = TeamSize::all()->sortBy('name');
         $organization_types = OrganizationType::all();
 
         return [

@@ -3,260 +3,297 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Admin;
+use App\Models\Candidate;
 use App\Models\Contract;
 use App\Models\ContractAgreement;
-use App\Models\IndustryType;
-use Illuminate\Http\Request;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Spatie\Permission\Models\Role;
-
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class AgentController extends Controller
 {
-    public function saveAgreement(Request $request)
-    {
-        // Validate the request
-        $request->validate([
-            'accept_agreement' => 'required|accepted', // Ensure the checkbox is checked
-        ]);
-
-        // Save contract details (if required)
-        $contract = new ContractAgreement();
-        $contract->admin_id = auth()->user()->id;
-        $contract->contract_content = $request->contract_content ?? ''; // Assuming contract content is dynamic
-        $contract->date_signed = now();
-        $contract->signature = auth()->user()->name; // User's name as the signature
-        $contract->is_contract_submitted = 1;
-        $contract->save();
-
-        // Redirect with success message
-        return redirect()->back()->with('success', 'Contract agreement has been saved successfully.');
-    }
-
-    public function contractForm()
-    {
-        // dd('asa');
-        $contract = Contract::first();
-
-        return view('backend.agent.contract', compact('contract'));
-    }
-    public function downloadAgreement()
-    {
-        $contract = Contract::first();
-        $pdf = Pdf::loadView('backend.agent.contract-pdf', compact('contract'));
-        return $pdf->download('Contract-Agreement.pdf');
-    }
-    public function approvedContract($id)
-    {
-        // Find the contract for the given admin ID
-        $contract = ContractAgreement::where('admin_id', $id)->first();
-        // dd($id);
-
-        // Check if the contract exists
-        if ($contract) {
-            $contract->is_approved = 1; // Approve the contract
-            $contract->save(); // Save the changes
-            return redirect()->back()->with('success', 'Contract Approved.');
-        }
-
-        // If contract not found, return an error response
-        return redirect()->back()->with('error', 'Contract Not Found.');
-    }
-
-
     public function index(Request $request)
     {
+        abort_if(! userCan('agent.view'), 403);
+
         try {
+            $query = User::query()
+                ->where('role', 'agent')
+                ->with(['parentAgencyUser:id,name,email'])
+                ->withCount('candidates');
 
-            $query = Admin::where('id', '!=', 1);
-            // verified status
-            if ($request->has('ev_status') && $request->ev_status != null) {
-                $ev_status = null;
-                if ($request->ev_status == 'true') {
-
+            if ($request->filled('ev_status')) {
+                if ($request->ev_status === 'true') {
                     $query->whereNotNull('email_verified_at');
                 } else {
-
                     $query->whereNull('email_verified_at');
                 }
             }
 
-            if ($request->keyword && $request->keyword != null) {
-
-                $query->where('name', 'LIKE', "%$request->keyword%")->orWhere('email', 'LIKE', "%$request->keyword%");
+            if ($request->filled('keyword')) {
+                $keyword = $request->keyword;
+                $query->where(function ($q) use ($keyword) {
+                    $q->where('name', 'LIKE', "%{$keyword}%")
+                        ->orWhere('email', 'LIKE', "%{$keyword}%")
+                        ->orWhere('username', 'LIKE', "%{$keyword}%");
+                });
             }
 
-            // sortby
-            if ($request->sort_by == 'latest' || $request->sort_by == null) {
-                $query->latest();
-            } else {
-                $query->oldest();
-            }
-            $roles = Role::where('id','!=',1)->get();
-            $agents = $query->paginate(10)->withQueryString();
-            // dd($candidates);
+            $request->sort_by === 'oldest'
+                ? $query->oldest()
+                : $query->latest();
 
-            return view('backend.agent.index', compact('agents','roles'));
+            $agents = $query->paginate(15)->withQueryString();
+            $agencies = User::query()->where('role', 'agency')->orderBy('name')->get(['id', 'name']);
+
+            return view('backend.agent.index', compact('agents', 'agencies'));
         } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
+            flashError($e->getMessage());
 
             return back();
+        }
+    }
+
+    public function create()
+    {
+        abort_if(! userCan('agent.create'), 403);
+
+        $agencies = User::query()->where('role', 'agency')->orderBy('name')->get(['id', 'name', 'email']);
+
+        return view('backend.agent.create', compact('agencies'));
+    }
+
+    public function store(Request $request)
+    {
+        abort_if(! userCan('agent.create'), 403);
+
+        try {
+            $data = $request->validate([
+                'name' => 'required|string|max:150',
+                'email' => 'required|email|unique:users,email',
+                'username' => 'nullable|string|max:100|unique:users,username',
+                'password' => 'required|string|min:6',
+                'agency_id' => [
+                    'nullable',
+                    Rule::exists('users', 'id')->where(fn ($q) => $q->where('role', 'agency')),
+                ],
+                'status' => 'nullable|boolean',
+            ]);
+
+            $username = $data['username'] ?? Str::slug($data['name']).'_'.Str::lower(Str::random(4));
+
+            User::create([
+                'name' => $data['name'],
+                'username' => $username,
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role' => 'agent',
+                'agency_id' => $data['agency_id'] ?? null,
+                'status' => $request->boolean('status', true) ? 1 : 0,
+                'email_verified_at' => now(),
+                'is_otp_verified' => 1,
+            ]);
+
+            flashSuccess('Agent / Facilitator created successfully');
+
+            return redirect()->route('agent.index');
+        } catch (\Exception $e) {
+            flashError($e->getMessage());
+
+            return back()->withInput();
         }
     }
 
     public function show($id)
     {
-        try {
-            $user = Admin::findOrFail($id);
-            $contract = Contract::first();
-            $contractAgreement = ContractAgreement::where('admin_id', $id)->first();
-            $industry_types = IndustryType::all()->sortBy('name');
+        abort_if(! userCan('agent.view'), 403);
 
-            return view('backend.agent.show', compact('user', 'contract', 'contractAgreement', 'industry_types'));
+        try {
+            $agent = User::query()
+                ->where('role', 'agent')
+                ->with(['parentAgencyUser'])
+                ->withCount('candidates')
+                ->findOrFail($id);
+
+            $workers = Candidate::query()
+                ->where('agent_id', $agent->id)
+                ->latest()
+                ->take(10)
+                ->get();
+
+            return view('backend.agent.show', compact('agent', 'workers'));
         } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
+            flashError($e->getMessage());
+
             return back();
+        }
+    }
+
+    public function edit($id)
+    {
+        abort_if(! userCan('agent.update'), 403);
+
+        $agent = User::query()->where('role', 'agent')->findOrFail($id);
+        $agencies = User::query()->where('role', 'agency')->orderBy('name')->get(['id', 'name', 'email']);
+
+        return view('backend.agent.edit', compact('agent', 'agencies'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        abort_if(! userCan('agent.update'), 403);
+
+        try {
+            $agent = User::query()->where('role', 'agent')->findOrFail($id);
+
+            $data = $request->validate([
+                'name' => 'required|string|max:150',
+                'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($agent->id)],
+                'username' => ['nullable', 'string', 'max:100', Rule::unique('users', 'username')->ignore($agent->id)],
+                'password' => 'nullable|string|min:6',
+                'agency_id' => [
+                    'nullable',
+                    Rule::exists('users', 'id')->where(fn ($q) => $q->where('role', 'agency')),
+                ],
+                'status' => 'nullable|boolean',
+            ]);
+
+            $agent->name = $data['name'];
+            $agent->email = $data['email'];
+            $agent->username = $data['username'] ?: $agent->username;
+            $agent->agency_id = $data['agency_id'] ?? null;
+            $agent->status = $request->boolean('status', (bool) $agent->status) ? 1 : 0;
+
+            if (! empty($data['password'])) {
+                $agent->password = Hash::make($data['password']);
+            }
+
+            $agent->save();
+
+            flashSuccess('Agent / Facilitator updated successfully');
+
+            return redirect()->route('agent.index');
+        } catch (\Exception $e) {
+            flashError($e->getMessage());
+
+            return back()->withInput();
         }
     }
 
     public function destroy($id)
     {
+        abort_if(! userCan('agent.delete'), 403);
 
         try {
-            $user = Admin::FindOrFail($id);
+            $agent = User::query()->where('role', 'agent')->findOrFail($id);
+            $agent->delete();
 
-            if (file_exists($user->image)) {
-                if ($user->image != 'backend/image/default.png') {
-                    unlink($user->image);
-                }
-            }
-            $user->delete();
-
-            flashSuccess(__('Deleted successfully'));
+            flashSuccess('Agent / Facilitator deleted successfully');
 
             return redirect()->route('agent.index');
         } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
+            flashError($e->getMessage());
 
             return back();
         }
     }
 
-    /**
-     * Change Admin status
-     *
-     * @return \Illuminate\Http\Response
-     */
+    public function status(Request $request)
+    {
+        abort_if(! userCan('agent.update'), 403);
+
+        try {
+            $user = User::query()->where('role', 'agent')->findOrFail($request->id);
+            $user->status = (int) $request->status;
+            $user->save();
+
+            return responseSuccess('Agent / Facilitator status updated');
+        } catch (\Exception $e) {
+            return responseError($e->getMessage());
+        }
+    }
+
     public function statusChange(Request $request)
     {
-        try {
-            $user = User::findOrFail($request->id);
-            $user->status = $request->status;
-            $user->save();
-
-            if ($request->status == 1) {
-                return responseSuccess(__('Admin_activated_successfully'));
-            } else {
-                return responseSuccess(__('Admin_deactivated_successfully'));
-            }
-        } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
-
-            return back();
-        }
-    }
-    public function is_Admin_featured(Request $request)
-    {
-        try {
-            $user = Admin::findOrFail($request->id);
-            $user->is_Admin_featured = $request->is_Admin_featured;
-            $user->save();
-
-            if ($request->is_Admin_featured == 1) {
-                return responseSuccess(__('Admin Featured Successfully'));
-            } else {
-                return responseSuccess(__('Admin Non-featured Successfully'));
-            }
-        } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
-
-            return back();
-        }
+        return $this->status($request);
     }
 
-    /**
-     * Change Admin verification status
-     *
-     * @return \Illuminate\Http\Response
-     */
     public function verificationChange(Request $request)
     {
+        abort_if(! userCan('agent.update'), 403);
+
         try {
-            $user = User::findOrFail($request->id);
+            $user = User::query()->where('role', 'agent')->findOrFail($request->id);
+            $user->email_verified_at = $request->status ? now() : null;
+            $user->save();
 
-            if ($request->status) {
-                $user->update(['email_verified_at' => now()]);
-                $message = __('email_verified_successfully');
-            } else {
-                $user->update(['email_verified_at' => null]);
-                $message = __('email_unverified_successfully');
-            }
-
-            return responseSuccess($message);
+            return responseSuccess($request->status
+                ? __('email_verified_successfully')
+                : __('email_unverified_successfully'));
         } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
-
-            return back();
+            return responseError($e->getMessage());
         }
     }
 
-    public function AdminExport($type)
+    public function candidates($id)
     {
-        $name = time() . '_Admins.' . $type;
-        try {
-            return Excel::download(new AdminExport, $name);
-        } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
+        abort_if(! userCan('agent.view'), 403);
 
-            return back();
-        }
+        $agent = User::query()->where('role', 'agent')->findOrFail($id);
+        $candidates = Candidate::query()
+            ->where('agent_id', $id)
+            ->latest()
+            ->paginate(20);
+
+        return view('backend.agent.candidates', compact('agent', 'candidates'));
     }
 
-    public function toggleProfileStatus(Request $request)
+    public function contractForm()
     {
-        $agent = Admin::find($request->id);
+        $contract = Contract::first();
 
-        if ($agent) {
-            // Toggle the is_profile_approved status
-            $agent->is_profile_approved = !$agent->is_profile_approved;
-            $agent->save();
-
-            return response()->json([
-                'status' => true,
-                'message' => 'Profile status updated successfully!',
-                'is_profile_approved' => $agent->is_profile_approved
-            ]);
-        }
-
-        return response()->json([
-            'status' => false,
-            'message' => 'Agent not found!'
-        ], 404);
+        return view('backend.agent.contract', compact('contract'));
     }
-    public function changeRole(Request $request)
+
+    public function saveAgreement(Request $request)
     {
         $request->validate([
-            'agent_id' => 'required|exists:users,id',
-            'role' => 'required|exists:roles,name',
+            'accept_agreement' => 'required|accepted',
         ]);
-        // dd('das');
 
-        $agent = Admin::findOrFail($request->agent_id);
+        $contract = new ContractAgreement;
+        $contract->admin_id = auth()->id();
+        $contract->contract_content = $request->contract_content ?? '';
+        $contract->date_signed = now();
+        $contract->signature = auth()->user()->name;
+        $contract->is_contract_submitted = 1;
+        $contract->save();
 
-        // Remove all roles and assign the new role
-        $agent->syncRoles($request->role);
+        return back()->with('success', 'Agreement saved');
+    }
 
-        return redirect()->back()->with('success', 'Role updated successfully!');
+    public function approvedContract($id)
+    {
+        $contract = ContractAgreement::where('admin_id', $id)->first();
+
+        if ($contract) {
+            $contract->is_approved = 1;
+            $contract->save();
+
+            return back()->with('success', 'Contract Approved');
+        }
+
+        return back()->with('error', 'Not Found');
+    }
+
+    public function downloadAgreement()
+    {
+        $contract = Contract::first();
+        $pdf = Pdf::loadView('backend.agent.contract-pdf', compact('contract'));
+
+        return $pdf->download('Contract-Agreement.pdf');
     }
 }

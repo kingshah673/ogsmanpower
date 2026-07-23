@@ -1,0 +1,707 @@
+/**
+ * Shared seeker (candidate) portal styles — aligned with settings page
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --bg-page: #f8fafc;
+    --color-slate-50: #f8fafc;
+    --color-slate-100: #f1f5f9;
+    --color-slate-200: #e2e8f0;
+    --color-slate-400: #94a3b8;
+    --color-slate-500: #64748b;
+    --color-slate-600: #475569;
+    --color-slate-700: #334155;
+    --color-slate-800: #1e293b;
+    --color-slate-900: #0f172a;
+    --color-primary: #2563eb;
+    --color-primary-hover: #1d4ed8;
+}
+
+.content-wrapper,
+.content-wrapper .content {
+    background: var(--bg-page) !important;
+}
+
+.seeker-settings-page,
+.seeker-module-page {
+    font-family: var(--font-primary);
+    color: var(--color-slate-800);
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 2rem;
+}
+
+.seeker-settings-page .container,
+.seeker-module-page .container {
+    max-width: 1100px;
+}
+
+.seeker-settings-page .cw-settings-header,
+.seeker-module-page .cw-settings-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.seeker-settings-page .cw-settings-header h1,
+.seeker-module-page .cw-settings-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+}
+
+.seeker-settings-page .cw-settings-header p,
+.seeker-module-page .cw-settings-header p {
+    font-size: 0.875rem;
+    color: var(--color-slate-600);
+    margin: 0;
+}
+
+.seeker-settings-page .pv-topbar-btn,
+.seeker-module-page .pv-topbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 6px;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.seeker-settings-page .pv-topbar-btn:hover,
+.seeker-module-page .pv-topbar-btn:hover {
+    background: var(--color-slate-50);
+    border-color: var(--color-slate-300);
+    color: var(--color-slate-900);
+    text-decoration: none;
+}
+
+.seeker-module-page .glass-card,
+.seeker-settings-page .glass-card {
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 12px;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.seeker-module-page .glass-card-body,
+.seeker-settings-page .glass-card-body {
+    padding: 1.25rem 1.5rem;
+}
+
+.seeker-module-page .glass-card h3,
+.seeker-module-page .dashboard-right > h3,
+.seeker-module-page .dashboard-right-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+}
+
+.seeker-module-page .jobcardStyle1,
+.seeker-module-page .accordion-item,
+.seeker-module-page .card.shadow-sm,
+.seeker-module-page .f-jobs-card {
+    background: #fff !important;
+    border: 1px solid var(--color-slate-200) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    margin-bottom: 0.75rem;
+}
+
+.seeker-module-page .btn-primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.seeker-module-page .btn-primary:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+.seeker-module-page .alert {
+    border-radius: 8px;
+    font-size: 0.875rem;
+}
+
+/* Dashboard & shared module utilities */
+.seeker-settings-page .card-ui,
+.seeker-module-page .card-ui {
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.seeker-settings-page .title,
+.seeker-module-page .title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+}
+
+.seeker-settings-page .sub,
+.seeker-module-page .sub {
+    color: var(--color-slate-600);
+    font-size: 0.8125rem;
+}
+
+.seeker-settings-page .btn-ui,
+.seeker-module-page .btn-ui {
+    background: var(--color-primary);
+    color: #fff;
+    padding: 0.4rem 0.875rem;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border: none;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.seeker-settings-page .btn-ui:hover,
+.seeker-module-page .btn-ui:hover {
+    background: var(--color-primary-hover);
+    color: #fff;
+}
+
+.seeker-settings-page .btn-ghost,
+.seeker-module-page .btn-ghost {
+    background: #fff;
+    color: var(--color-slate-600);
+    padding: 0.4rem 0.875rem;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    border: 1px solid var(--color-slate-200);
+}
+
+.seeker-settings-page .job-row,
+.seeker-module-page .job-row {
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--color-slate-100);
+}
+
+.seeker-settings-page .profile-badge,
+.seeker-module-page .profile-badge {
+    font-size: 0.75rem;
+    background: #dbeafe;
+    color: #1d4ed8;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.seeker-settings-page .edit-field,
+.seeker-module-page .edit-field {
+    width: 100%;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-slate-800);
+    background: var(--color-slate-50);
+}
+
+.seeker-settings-page .edit-field:focus,
+.seeker-module-page .edit-field:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    background: #fff;
+}
+
+.seeker-settings-page .status-badge,
+.seeker-module-page .status-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.625rem;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.seeker-settings-page .status-available,
+.seeker-module-page .status-available { background: #dcfce7; color: #16a34a; }
+.seeker-settings-page .status-not_available,
+.seeker-module-page .status-not_available { background: #fee2e2; color: #dc2626; }
+.seeker-settings-page .status-available_in,
+.seeker-module-page .status-available_in { background: #fef9c3; color: #ca8a04; }
+
+.seeker-settings-page .pro-card,
+.seeker-module-page .pro-card {
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    margin-bottom: 1.25rem;
+}
+
+.seeker-settings-page .pro-title,
+.seeker-module-page .pro-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+}
+
+.seeker-settings-page .pro-option,
+.seeker-module-page .pro-option {
+    display: block;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.seeker-settings-page .pro-option:hover,
+.seeker-module-page .pro-option:hover {
+    border-color: var(--color-primary);
+    background: #eff6ff;
+}
+
+.seeker-settings-page .pro-select,
+.seeker-module-page .pro-select {
+    border-radius: 6px;
+    border: 1px solid var(--color-slate-200);
+}
+
+.seeker-settings-page .pro-btn,
+.seeker-module-page .pro-btn {
+    background: var(--color-primary);
+    color: #fff;
+    border-radius: 6px;
+    font-weight: 600;
+    border: none;
+    padding: 0.5rem 1rem;
+}
+
+.seeker-settings-page .accordion-item,
+.seeker-module-page .accordion-item {
+    border-left: 3px solid var(--color-primary) !important;
+}
+
+.seeker-settings-page .jobcardStyle1,
+.seeker-settings-page .f-jobs-card,
+.seeker-settings-page .card.shadow-sm {
+    background: #fff !important;
+    border: 1px solid var(--color-slate-200) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    margin-bottom: 0.75rem;
+}
+
+.seeker-settings-page .btn-primary,
+.seeker-module-page .btn-primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.seeker-settings-page .pv-readonly-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-slate-500);
+}
+
+.seeker-settings-page .pv-readonly-value {
+    font-size: 0.875rem;
+    color: var(--color-slate-800);
+    background: var(--color-slate-50);
+    border: 1px solid var(--color-slate-200);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+}
+
+.seeker-settings-page .pv-field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+@media (max-width: 640px) {
+    .seeker-settings-page .pv-field-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Profile completion checklist (sidebar + settings) */
+.cw-profile-completion-hints {
+    margin-top: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    text-align: left;
+}
+
+.cw-profile-completion-hints--compact {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.72rem;
+}
+
+.cw-profile-completion-hints__title {
+    margin: 0 0 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #92400e;
+    line-height: 1.3;
+}
+
+.cw-profile-completion-hints--compact .cw-profile-completion-hints__title {
+    font-size: 0.68rem;
+}
+
+.cw-profile-completion-hints__pct {
+    font-weight: 500;
+    color: #b45309;
+}
+
+.cw-profile-completion-hints__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cw-profile-completion-hints__list li + li {
+    margin-top: 0.35rem;
+}
+
+.cw-profile-completion-hints__link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    line-height: 1.35;
+}
+
+.cw-profile-completion-hints__link:hover {
+    text-decoration: none;
+    color: var(--color-primary);
+}
+
+.cw-profile-completion-hints__link strong {
+    display: block;
+    font-size: 0.72rem;
+    color: #78350f;
+}
+
+.cw-profile-completion-hints__link span {
+    display: block;
+    font-size: 0.68rem;
+    color: #92400e;
+}
+
+.cw-profile-completion-hints--compact .cw-profile-completion-hints__link strong {
+    font-size: 0.67rem;
+}
+
+.cw-profile-completion-hints--compact .cw-profile-completion-hints__link span {
+    font-size: 0.62rem;
+}
+
+/* Portal top nav + compact notification panel (seeker + employer) */
+.main-header.navbar {
+    display: flex !important;
+    align-items: center;
+    min-height: 56px;
+    padding: 0 0.75rem 0 0.5rem !important;
+    background: #0A65CC !important;
+    border-bottom: none !important;
+    overflow: visible !important;
+}
+
+.main-header .navbar-nav.ml-auto,
+.main-header .cw-nav-actions {
+    overflow: visible !important;
+}
+
+.main-header .cw-portal-title {
+    flex: 1;
+    text-align: center;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+    margin: 0 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.main-header .cw-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible !important;
+}
+
+.main-header .cw-nav-actions > li {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    position: relative;
+}
+
+.main-header .cw-nav-actions .nav-link {
+    color: #fff !important;
+    padding: 0.45rem 0.55rem;
+    line-height: 1;
+    border-radius: 8px;
+}
+
+.main-header .cw-nav-actions .nav-link:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.main-header .candidate-profile img {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+}
+
+.cw-notif-item {
+    position: relative;
+}
+
+.cw-notif-bell.notification-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    z-index: 40;
+}
+
+.cw-notif-bell.notification-icon:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.cw-notif-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    border: 1.5px solid #0A65CC;
+    z-index: 2;
+}
+
+/*
+ * Anchor panel to the nav action item and shift right so it lines up
+ * with the avatar / screen edge (bell sits left of the avatar).
+ */
+.main-header .cw-notif-item .notification-bar,
+.main-header .cw-notif-item .cw-notif-panel,
+.cw-notif-item .notification-bar,
+.cw-notif-item .cw-notif-panel {
+    width: 360px !important;
+    max-width: min(360px, calc(100vw - 16px)) !important;
+    left: auto !important;
+    right: -52px !important;
+    top: calc(100% + 10px) !important;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    background: #fff !important;
+    position: absolute !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16) !important;
+    z-index: 2000 !important;
+    color: #0f172a;
+    overflow: hidden;
+    padding: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+}
+
+.notification-icon.notification-visiable .notification-bar,
+.cw-notif-bell.notification-visiable .cw-notif-panel,
+.cw-notif-item .notification-icon.notification-visiable .notification-bar {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto;
+}
+
+.cw-notif-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.cw-notif-panel-head strong {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.cw-notif-mark {
+    font-size: 0.78rem;
+    color: #2563eb;
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.cw-notif-mark:hover {
+    text-decoration: underline;
+}
+
+.cw-notif-list.notification-list {
+    max-height: 280px !important;
+    overflow-y: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.cw-notif-list ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.cw-notif-list li {
+    margin: 0;
+    padding: 0 !important;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.cw-notif-list li:last-child {
+    border-bottom: none;
+}
+
+.cw-notif-list li a {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.7rem 1rem;
+    text-decoration: none;
+    color: inherit;
+}
+
+.cw-notif-list li a:hover {
+    background: #f8fafc;
+}
+
+.cw-notif-list li.is-unread {
+    background: #eff6ff;
+}
+
+.cw-notif-thumb {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #e7f0fa;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #0A65CC;
+}
+
+.cw-notif-list li.is-unread .cw-notif-thumb {
+    background: #dbeafe;
+}
+
+.cw-notif-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.cw-notif-title {
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: #0f172a;
+    line-height: 1.35;
+}
+
+.cw-notif-list li.is-unread .cw-notif-title {
+    font-weight: 600;
+}
+
+.cw-notif-time {
+    font-size: 0.74rem;
+    color: #64748b;
+}
+
+.cw-notif-empty {
+    padding: 1.25rem 1rem;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.cw-notif-footer {
+    display: block;
+    text-align: center;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid #e2e8f0;
+    background: #fff;
+    color: #2563eb;
+    font-size: 0.84rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.cw-notif-footer:hover {
+    background: #f8fafc;
+    text-decoration: none;
+    color: #1d4ed8;
+}
+
+@media (max-width: 767px) {
+    .main-header .cw-portal-title {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-header .cw-portal-title {
+        display: none;
+    }
+    .main-header .cw-notif-item .cw-notif-panel,
+    .cw-notif-item .cw-notif-panel {
+        width: min(320px, calc(100vw - 12px)) !important;
+        right: -8px !important;
+    }
+}

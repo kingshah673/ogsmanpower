@@ -24,6 +24,14 @@ class MessengerController extends Controller
         return view('frontend.pages.company.message', compact('users', 'jobs'));
     }
 
+    public function agencyMessages()
+    {
+        $users = $this->fetchAgencyUserList();
+        $jobs = Job::where('agency_id', currentAgency()->id)->active()->get(['id', 'title']);
+
+        return view('frontend.pages.company.message', compact('users', 'jobs'));
+    }
+
     public function candidateMessages()
     {
         $applied_jobs = AppliedJob::with('applicationGroup:id,name')->get();
@@ -109,15 +117,19 @@ class MessengerController extends Controller
 
     public function messageSendCandidate(Request $request)
     {
+        $role = auth()->user()->role;
+        $ownerColumn = $role === 'agency' ? 'agency_id' : 'company_id';
+        $ownerId = $role === 'agency' ? currentAgency()->id : currentCompany()->id;
+
         $message_user_exists = MessengerUser::where('candidate_id', $request->candidate_id)
-            ->where('company_id', currentCompany()->id)
+            ->where($ownerColumn, $ownerId)
             // ->where('job_id', $request->job_id)
             ->first();
 
         if (! $message_user_exists) {
             $message_user_exists = MessengerUser::create([
                 'candidate_id' => $request->candidate_id,
-                'company_id' => currentCompany()->id,
+                $ownerColumn => $ownerId,
                 'job_id' => $request->job_id ?? null,
             ]);
         }
@@ -159,6 +171,8 @@ class MessengerController extends Controller
 
         if ($role == 'company') {
             $users = $this->fetchCompanyUserList();
+        } elseif ($role == 'agency') {
+            $users = $this->fetchAgencyUserList();
         } elseif ($role == 'candidate') {
             $users = $this->fetchCandidateUserList();
         }
@@ -171,6 +185,38 @@ class MessengerController extends Controller
         $applied_jobs = AppliedJob::with('applicationGroup:id,name')->get();
         $all_users = MessengerUser::whereHas('messages')->with('candidate', 'job:id,title,slug')
             ->where('company_id', currentCompany()->id)
+            ->withCount(['messages as latest_message_time' => function ($query) {
+                $query->select(\DB::raw('max(created_at)'));
+            }])
+            ->orderByDesc('latest_message_time')
+            ->get();
+
+        $users = $all_users->unique('candidate_id')->map(function ($user) use ($applied_jobs) {
+            $applied_job = $applied_jobs->where('candidate_id', $user->candidate_id)->where('job_id', $user->job_id)->first();
+
+            $last_message = Messenger::candidateMessages($user)->latest()->first();
+
+            if ($last_message) {
+                $user->latest_message = $last_message->body;
+                $diff_time = $last_message->created_at->diffForHumans(now(), CarbonInterface::DIFF_RELATIVE_AUTO, true, 1);
+                $user->latest_message_humans_time = Str::of($diff_time)->replace(['from now', 'before'], '')->trim();
+
+                $user->last_message_from_me = $last_message->from == auth()->id();
+            }
+            $user->unread_count = $this->getUnreadMessageCount($user->candidate_id);
+            $user->application_status = $applied_job->applicationGroup->name ?? 'All Applications';
+
+            return $user;
+        });
+
+        return $users;
+    }
+
+    protected function fetchAgencyUserList()
+    {
+        $applied_jobs = AppliedJob::with('applicationGroup:id,name')->get();
+        $all_users = MessengerUser::whereHas('messages')->with('candidate', 'job:id,title,slug')
+            ->where('agency_id', currentAgency()->id)
             ->withCount(['messages as latest_message_time' => function ($query) {
                 $query->select(\DB::raw('max(created_at)'));
             }])
@@ -229,11 +275,14 @@ class MessengerController extends Controller
 
     public function filterUsers(Request $request)
     {
-        if ($request->role == 'company') {
+        if ($request->role == 'company' || $request->role == 'agency') {
+            $ownerColumn = $request->role === 'agency' ? 'agency_id' : 'company_id';
+            $ownerId = $request->role === 'agency' ? currentAgency()->id : currentCompany()->id;
+
             $applied_jobs = AppliedJob::with('applicationGroup:id,name')->get();
             $all_users = MessengerUser::whereHas('messages')
                 ->with('candidate', 'job:id,title,slug')
-                ->where('company_id', currentCompany()->id)
+                ->where($ownerColumn, $ownerId)
                 ->when($request->job, function ($query) use ($request) {
                     $query->where('job_id', $request->job);
                 })
@@ -307,6 +356,13 @@ class MessengerController extends Controller
 
         if ($auth_user->role == 'company') {
             $user_messenger_id = MessengerUser::where('company_id', currentCompany()->id)->where('candidate_id', $id)->value('id');
+
+            $unread_count = Messenger::where('messenger_user_id', $user_messenger_id)
+                ->where('to', auth()->id())
+                ->where('read', '!=', 1)
+                ->count();
+        } elseif ($auth_user->role == 'agency') {
+            $user_messenger_id = MessengerUser::where('agency_id', currentAgency()->id)->where('candidate_id', $id)->value('id');
 
             $unread_count = Messenger::where('messenger_user_id', $user_messenger_id)
                 ->where('to', auth()->id())

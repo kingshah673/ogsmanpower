@@ -63,7 +63,7 @@ class JobListService
     public function loadMore($request)
     {
         if ($request->page == 1) {
-            $query = $this->filterJobs($request);
+            $query = $this->filterJobs($request)->publicListing();
             $query->where('id', '<', $request->id);
 
             $jobs = $query->take(18)->latest()->get();

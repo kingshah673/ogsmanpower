@@ -44,7 +44,7 @@ class LoginController extends Controller
     public function showLoginForm()
     {
         if (auth('user')->check()) {
-            return redirect()->route('user.dashboard');
+            return redirect(user_home_route());
         }
 
         return view('backend.auth.login');

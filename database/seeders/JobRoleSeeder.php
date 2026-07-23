@@ -9,11 +9,17 @@ class JobRoleSeeder extends Seeder
 {
     /**
      * Run the database seeds.
-     *
-     * @return void
+     * Prefer full catalog sync when data file exists; otherwise seed a small default set.
      */
     public function run()
     {
+        $catalog = database_path('seeders/data/job_roles.json');
+        if (is_file($catalog)) {
+            $this->call(JobRoleCatalogSeeder::class);
+
+            return;
+        }
+
         if (! config('templatecookie.testing_mode')) {
             $job_roles = [
                 'Team Leader', 'Manager', 'Assistant Manager', 'Executive', 'Director', 'Administrator',
@@ -23,12 +29,6 @@ class JobRoleSeeder extends Seeder
                 'Team Leader', 'Manager',
             ];
         }
-
-        // foreach ($job_roles as $data) {
-        //     JobRole::create([
-        //         'name' => $data
-        //     ]);
-        // }
 
         $languages = loadLanguage();
 

@@ -24,6 +24,22 @@ return [
         'token' => env('POSTMARK_TOKEN'),
     ],
 
+    /*
+    | OpenAI + OCR credentials.
+    | Kept here (not read via env() at runtime) so they survive `config:cache`
+    | in production — env() returns null once config is cached.
+    */
+    'openai' => [
+        'key'      => env('OPENAI_API_KEY'),
+        'model'    => env('OPENAI_MODEL', 'gpt-4o-mini'),
+        'cv_model' => env('OPENAI_CV_MODEL', env('OPENAI_MODEL', 'gpt-4o-mini')),
+    ],
+
+    'ocr' => [
+        'key'      => env('OCR_API_KEY'),
+        'endpoint' => env('OCR_API_ENDPOINT', 'https://apipro2.ocr.space/parse/image'),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

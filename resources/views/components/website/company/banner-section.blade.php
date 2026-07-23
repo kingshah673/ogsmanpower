@@ -1,10 +1,15 @@
 @props([
     'user' => '',
 ])
-<div class="col-lg-8">
+@php
+    $bannerOnDisk = $user->company?->bannerFileExists();
+@endphp
+<div class="col-md-8 col-12 mb-4">
     <x-forms.label name="banner_image"
         class="pointer body-font-4 d-block text-gray-900 rt-mb-8" />
-    <div id="banner-uploadMode" class="{{  $user->company->banner ? 'd-none' : '' }}">
+
+    {{-- Upload mode: no banner, or after clicking Change --}}
+    <div id="banner-uploadMode" class="{{ $bannerOnDisk ? 'd-none' : '' }}">
         <div class="banner-image-upload-wrap">
             <input name="banner" class="banner-file-upload-input"
                 type='file' onchange="readURL(this);" accept="image/*" />
@@ -24,18 +29,15 @@
                         stroke-width="3" stroke-linecap="round"
                         stroke-linejoin="round" />
                 </svg>
-
                 <h3>{{ __('browse_photo_or_drop_here') }}</h3>
-                <p>{{ __('photo_larger_than_pixels_work_best_max_photo_size_mb') }}
-                </p>
+                <p>{{ __('photo_larger_than_pixels_work_best_max_photo_size_mb') }}</p>
             </div>
         </div>
         <div class="banner-file-upload-content">
-            <img class="banner-file-upload-image" src="#"
-                alt="your image" />
+            <img class="banner-file-upload-image" src="#" alt="your image" />
             <div class="image-title-wrap">
-                <button type="button" class="banner-remove-image"><svg
-                        width="20" height="20" viewBox="0 0 20 20"
+                <button type="button" class="banner-remove-image">
+                    <svg width="20" height="20" viewBox="0 0 20 20"
                         fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M16.875 4.375L3.125 4.37501" stroke="#E05151"
                             stroke-width="1.5" stroke-linecap="round"
@@ -55,39 +57,35 @@
                             stroke="#E05151" stroke-width="1.5"
                             stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
-                    </span></button>
+                </button>
             </div>
         </div>
     </div>
-    <div  id="banner-oldMode" class="{{  $user->company->banner ? '' : 'd-none' }} banner-file-upload-content2">
-        <img class="banner-file-upload-image" src="{{  $user->company->banner_url }}"
-            alt="your image" />
-        <div onclick="UploadMode('banner')" class="image-title-wrap">
-            <button type="button" class="banner-remove-image"><svg
-                    width="20" height="20" viewBox="0 0 20 20"
-                    fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M16.875 4.375L3.125 4.37501" stroke="#E05151"
-                        stroke-width="1.5" stroke-linecap="round"
-                        stroke-linejoin="round" />
-                    <path d="M8.125 8.125V13.125" stroke="#E05151"
-                        stroke-width="1.5" stroke-linecap="round"
-                        stroke-linejoin="round" />
-                    <path d="M11.875 8.125V13.125" stroke="#E05151"
-                        stroke-width="1.5" stroke-linecap="round"
-                        stroke-linejoin="round" />
+
+    {{-- Existing banner: always-visible change affordance (not hover-only) --}}
+    <div id="banner-oldMode" class="{{ $bannerOnDisk ? '' : 'd-none' }}">
+        <div class="banner-current-wrap" onclick="UploadMode('banner')" title="Click to change banner">
+            <img class="banner-file-upload-image" src="{{ $user->company->banner_url }}"
+                alt="company banner" />
+            <div class="banner-change-overlay">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                    xmlns="http://www.w3.org/2000/svg">
                     <path
-                        d="M15.625 4.375V16.25C15.625 16.4158 15.5592 16.5747 15.4419 16.6919C15.3247 16.8092 15.1658 16.875 15 16.875H5C4.83424 16.875 4.67527 16.8092 4.55806 16.6919C4.44085 16.5747 4.375 16.4158 4.375 16.25V4.375"
-                        stroke="#E05151" stroke-width="1.5"
-                        stroke-linecap="round" stroke-linejoin="round" />
-                    <path
-                        d="M13.125 4.375V3.125C13.125 2.79348 12.9933 2.47554 12.7589 2.24112C12.5245 2.0067 12.2065 1.875 11.875 1.875H8.125C7.79348 1.875 7.47554 2.0067 7.24112 2.24112C7.0067 2.47554 6.875 2.79348 6.875 3.125V4.375"
-                        stroke="#E05151" stroke-width="1.5"
+                        d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+                        stroke="white" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <circle cx="12" cy="13" r="4" stroke="white" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
-                </span></button>
+                <span>Change Banner</span>
+            </div>
         </div>
+        <button type="button" class="banner-change-btn" onclick="UploadMode('banner')">
+            <i class="fas fa-upload"></i> Change / Upload Banner
+        </button>
     </div>
-    <p class="tw-text-gray-500 tw-text-xs tw-text-left mt-2">Image Size: 1920x312</p>
+
+    <p class="tw-text-gray-500 tw-text-xs tw-text-left mt-2">Image Size: 1920×312px</p>
     @error('banner')
         <span class="text-danger">
             <strong>{{ __($message) }}</strong>

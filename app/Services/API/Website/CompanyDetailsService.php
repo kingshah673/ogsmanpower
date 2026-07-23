@@ -76,7 +76,7 @@ class CompanyDetailsService
                 $open_jobs_query->where('country', 'LIKE', "%$selected_country%");
             }
         }
-        $open_jobs = $open_jobs_query->companyJobs($companyDetails->id)->with('job_type:id,name')->latest()->paginate(8);
+        $open_jobs = $open_jobs_query->companyJobs($companyDetails->id)->with('job_type')->latest()->paginate(8);
 
         return [
             'companyDetails' => $companyDetails,

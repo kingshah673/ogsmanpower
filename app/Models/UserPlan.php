@@ -13,39 +13,153 @@ class UserPlan extends Model
 
     protected $guarded = [];
 
-    /**
-     *  Customer scope
-     *
-     * @return mixed
-     */
-    public function scopeCompanyData($query, $company_id = null)
+    /*
+    |--------------------------------------------------------------------------
+    | USER
+    |--------------------------------------------------------------------------
+    */
+
+    public function user(): BelongsTo
     {
-        return $query->where('company_id', $company_id ?? currentCompany()->id);
+        return $this->belongsTo(
+            User::class
+        );
     }
 
-    /**
-     *  Company scope for api response
-     *
-     * @return mixed
-     */
-    public function scopeApiCompanyData($query, $company_id = null)
-    {
-        return $query->where('company_id', $company_id ?? auth()->user()->companyId());
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | COMPANY
+    |--------------------------------------------------------------------------
+    */
 
-    /**
-     * Get the company that owns the UserPlan
-     */
     public function company(): BelongsTo
     {
-        return $this->belongsTo(company::class, 'company_id');
+        return $this->belongsTo(
+            Company::class,
+            'company_id'
+        );
     }
 
-    /**
-     * Get the plan that owns the UserPlan
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | AGENCY
+    |--------------------------------------------------------------------------
+    */
+
+    public function agency(): BelongsTo
+    {
+        return $this->belongsTo(
+            Agency::class,
+            'agency_id'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PLAN
+    |--------------------------------------------------------------------------
+    */
+
     public function plan(): BelongsTo
     {
-        return $this->belongsTo(Plan::class, 'plan_id');
+        return $this->belongsTo(
+            Plan::class,
+            'plan_id'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ACTIVE SCOPE
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeActive($query)
+    {
+        return $query->where(
+            'status',
+            'active'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | USER DATA
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeUserData(
+        $query,
+        $user_id = null
+    )
+    {
+        return $query->where(
+            'user_id',
+            $user_id ?? auth()->id()
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | COMPANY DATA
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeCompanyData(
+        $query,
+        $company_id = null
+    )
+    {
+        return $query->where(
+            'company_id',
+            $company_id ?? currentCompany()->id
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AGENCY DATA
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeAgencyData(
+        $query,
+        $agency_id = null
+    )
+    {
+        return $query->where(
+            'agency_id',
+            $agency_id ?? currentAgency()->id
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | EXPIRED CHECK
+    |--------------------------------------------------------------------------
+    */
+
+    public function isExpired()
+    {
+        if (!$this->expires_at) {
+
+            return false;
+        }
+
+        return now()->gt(
+            $this->expires_at
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ACTIVE CHECK
+    |--------------------------------------------------------------------------
+    */
+
+    public function isActive()
+    {
+        return $this->status == 'active'
+            && !$this->isExpired();
     }
 }

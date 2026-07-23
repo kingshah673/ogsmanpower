@@ -32,6 +32,14 @@ class Earning extends Model
     }
 
     /**
+     * Get the agency that owns the Earning
+     */
+    public function agency(): BelongsTo
+    {
+        return $this->belongsTo(Agency::class, 'agency_id');
+    }
+
+    /**
      * Get the plan that owns the Earning
      */
     public function plan(): BelongsTo

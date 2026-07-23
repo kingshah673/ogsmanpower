@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Candidate\CandidateResource;
 use App\Http\Resources\Company\CompanyResource;
+use App\Http\Resources\Agency\AgencyResource;
 use App\Http\Resources\Agent\AgentResource;
 use App\Models\Admin;
 use App\Models\Setting;
@@ -16,6 +17,8 @@ use App\Notifications\CandidateCreateApprovalPendingNotification;
 use App\Notifications\CandidateCreateNotification;
 use App\Notifications\CompanyCreateApprovalPendingNotification;
 use App\Notifications\CompanyCreatedNotification;
+use App\Notifications\AgencyCreateApprovalPendingNotification;
+use App\Notifications\AgencyCreatedNotification;
 use F9Web\ApiResponseHelpers;
 use Firebase\Auth\Token\Exception\InvalidToken;
 use Illuminate\Http\Request;
@@ -29,29 +32,54 @@ class AuthController extends Controller
     use ApiResponseHelpers;
 
     public function login(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+{
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
+
+    if (Auth::attempt([
+        'email' => $request->email,
+        'password' => $request->password
+    ])) {
+
+        $user = Auth::user();
+        $token = $user->createToken('job-pilot')->plainTextToken;
+
+        // Clean role-based resource handling
+        $userResource = null;
+
+        switch ($user->role) {
+            case 'candidate':
+                $userResource = new CandidateResource($user->candidate);
+                break;
+
+            case 'company':
+                $userResource = new CompanyResource($user->company);
+                break;
+
+            case 'agency':
+                $userResource = new AgencyResource($user->agency);
+                break;
+
+            case 'agent':
+                $userResource = new AgentResource($user->agent);
+                break;
+        }
+
+        return $this->respondWithSuccess([
+            'data' => [
+                'token' => $token,
+                'message' => 'Login Succeeded',
+                'user' => $userResource,
+            ],
         ]);
 
-        if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
-            $user = Auth::user();
-            $token = $user->createToken('job-pilot')->plainTextToken;
-
-            return $this->respondWithSuccess([
-                'data' => [
-                    'token' => $token,
-                    'message' => 'Login Succeeded',
-                    // 'user' => $user->role == 'candidate' ? new CandidateResource($user->candidate) : new CompanyResource($user->company),
-                    'user' => $user->role == 'candidate' ? new CandidateResource($user->candidate): ($user->role == 'company'? new CompanyResource($user->company): ($user->role == 'agent'? new AgentResource($user->agent)   : null)),
-
-                ],
-            ]);
-        } else {
-            return $this->respondUnAuthenticated('Invalid Credentials');
-        }
+    } else {
+        return $this->respondUnAuthenticated('Invalid Credentials');
     }
+}
+    
 
     public function getUserInfo(Request $request)
     {
@@ -65,8 +93,11 @@ class AuthController extends Controller
                     'token' => $request->bearerToken(),
                     'message' => 'User data retrieved successfully',
                     // 'user' => $user->role == 'candidate' ? new CandidateResource($user->candidate) : new CompanyResource($user->company),
-                    'user' => $user->role == 'candidate' ? new CandidateResource($user->candidate): ($user->role == 'company'? new CompanyResource($user->company): ($user->role == 'agent'? new AgentResource($user->agent)   : null)), // You can handle other roles here if needed
-
+                    'user' => $user->role == 'candidate'? new CandidateResource($user->candidate): ($user->role == 'company'? new CompanyResource($user->company): ($user->role == 'agency'? new AgencyResource($user->agency): ($user->role == 'agent'? new AgentResource($user->agent)
+                : null
+            )
+        )
+    ),
                 ],
             ]);
         } else {
@@ -96,7 +127,7 @@ class AuthController extends Controller
 
         $user = User::create([
             // 'role' => $request->role == 'candidate' ? 'candidate' : 'company',
-            'role' => $request->role == 'candidate' ? 'candidate' : ($request->role == 'agent' ? 'agent' : 'company'),
+            'role' => in_array($request->role, ['candidate','company','agency','agent']) ? $request->role : 'candidate',
             'name' => $request->name,
             'username' => $username,
             'email' => $request->email,
@@ -128,6 +159,24 @@ class AuthController extends Controller
                     Notification::route('mail', $user->email)->notify(new CompanyCreatedNotification($user, $request->password));
                 } else {
                     Notification::route('mail', $user->email)->notify(new CompanyCreateApprovalPendingNotification($user, $request->password));
+                }
+            }
+            elseif ($user->role == 'agent') {
+                $employer_auto_activation_enabled = Setting::where('agent_auto_activation', 1)->count();
+
+                if ($employer_auto_activation_enabled) {
+                    Notification::route('mail', $user->email)->notify(new AgentCreatedNotification($user, $request->password));
+                } else {
+                    Notification::route('mail', $user->email)->notify(new AgentCreateApprovalPendingNotification($user, $request->password));
+                }
+            }
+            elseif ($user->role == 'agency') {
+                $employer_auto_activation_enabled = Setting::where('agency_auto_activation', 1)->count();
+
+                if ($employer_auto_activation_enabled) {
+                    Notification::route('mail', $user->email)->notify(new AgencyCreatedNotification($user, $request->password));
+                } else {
+                    Notification::route('mail', $user->email)->notify(new AgencyCreateApprovalPendingNotification($user, $request->password));
                 }
             }
         }

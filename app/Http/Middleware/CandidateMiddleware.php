@@ -25,6 +25,9 @@ class CandidateMiddleware
         if (authUser()->role == 'agent') {
             return redirect()->route('agent.dashboard');
         }
+        if (authUser()->role == 'agency') {
+            return redirect()->route('agency.dashboard');
+        }
 
         return redirect()->route('login');
     }

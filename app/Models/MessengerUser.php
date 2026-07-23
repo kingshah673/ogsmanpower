@@ -13,6 +13,7 @@ class MessengerUser extends Model
 
     protected $fillable = [
         'company_id',
+        'agency_id',
         'candidate_id',
         'job_id',
     ];
@@ -20,6 +21,11 @@ class MessengerUser extends Model
     public function company()
     {
         return $this->belongsTo(Company::class)->select('id', 'user_id', 'logo')->with('user:id,name,username');
+    }
+
+    public function agency()
+    {
+        return $this->belongsTo(Agency::class)->select('id', 'user_id')->with('user:id,name,username');
     }
 
     public function candidate()

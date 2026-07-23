@@ -17,15 +17,18 @@
     }
 </style>
 @section('main')
+<div class="dashboard-wrapper seeker-settings-page">
+<div class="container">
+<div class="dashboard-right">
 
+<x-website.candidate.seeker-page-header
+    :title="__('plans')"
+    :subtitle="__('Feature your profile by subscribing to a plan.')"
+/>
 
+<div class="glass-card"><div class="glass-card-body">
 
-    {{-- <div class="my-5 justify-content-end">
-            <a href="{{route('candidate.edit.plan')}}" name="" id="" class="btn btn-primary" href="#" role="button">Edit Plan</a>
-        </div>
- --}}
- {{-- @dd($plan_Subscription->candidate->is_candidate_featured) --}}
- @if($plan)
+@if($plan)
  @if ($plan_Subscription && $plan_Subscription->candidate && $plan_Subscription->candidate->is_candidate_featured == '1')
  <div class="text-center my-5">
      <h1>Plan Subscribed</h1>
@@ -61,8 +64,16 @@
      </div>
  </div>
 @endif
+@else
+ <div class="text-center py-5">
+     <p class="text-muted mb-0">{{ __('No subscription plans are available at the moment.') }}</p>
+ </div>
 @endif
 
+</div></div>
 
+</div>
+</div>
+</div>
 
 @endsection

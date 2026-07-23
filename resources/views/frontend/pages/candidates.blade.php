@@ -14,144 +14,58 @@
 @endsection
 
 @section('main')
-    <!-- Filter Component -->
     <x-website.candidate.candidate-filter :popular-tags="$popularTags" :professions="$professions" :experiences="$experiences" :educations="$educations"
         :skills="$skills" />
 
-    <div class="" id="togglclass1">
-        <div class="tab-content" id="nav-tabContent">
-            <div class="tab-pane  show active" id="nav-home" role="tabpanel" aria-labelledby="nav-home-tab">
-                @if ($candidates->count() > 0)
-                    <div class="row">
-                        @foreach ($candidates as $candidate)
-                            @if (optional($candidate->user)->username != '')
-                                <div
-                                    class="@if (request('education') || request('gender') || request('experience') || request('skills')) col-md-6 fade-in-bottom  condition_class rt-mb-24 @else col-md-6 fade-in-bottom  condition_class rt-mb-24 col-xl-4 @endif">
-                                    <a onclick="showCandidateProfileModal('{{ $candidate->user->username ?? '' }}')"
-                                        href="javascript:void(0);"
-                                        class="card jobcardStyle1 body-24 {{ !auth('user')->check() ? 'login_required' : '' }}">
-                                        <div class="card-body">
-                                            <div style="position: absolute; top: 10px; right: 10px;">
-                                                <button type="button" onclick="copyToClipboard(event)" class="btn btn-sm btn-light"
-                                                    title="Share">
-                                                    <x-svg.share-icon />
-                                                </button>
-                                            </div>
-                                            <div class="rt-single-icon-box icb-clmn-lg tw-reltaive">
-                                                <div class="icon-thumb tw-relative">
-                                                    <div class="profile-image">
-                                                        <img src="{{ $candidate->photo }}"
-                                                            alt="{{ __('candidate_image') }}">
-                                                    </div>
-                                                    <div class="tw-absolute tw-top-0 tw-left-1">
-                                                        @if ($candidate->status == 'available')
-                                                            <div class="tw-inline-flex">
-                                                                <svg width="14" height="14" viewBox="0 0 14 14"
-                                                                    fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                                    <circle cx="7" cy="7" r="6"
-                                                                        fill="#2ecc71" stroke="white" stroke-width="2">
-                                                                    </circle>
-                                                                </svg>
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                @php
-                                                    $option = auth('user')->check() ? '' : '';
-                                                @endphp
-                                                <div class="iconbox-content !tw-m-0">
-                                                    <div class="job-mini-title">
-                                                        @if (auth('user')->check())
-                                                            <span>
-                                                                {{ $candidate->user->name ?? '' }}
-                                                            </span>
-                                                        @else
-                                                            <span class="login_required">
-                                                                {{ maskFullName($candidate->user->name ?? '') }}
-                                                            </span>
-                                                        @endif
-                                                    </div>
-                                                    <span class="loacton text-gray-500 ">
-                                                        {{ $candidate->profession ? $candidate->profession->name : '' }}
-                                                    </span>
-                                                    @if ($candidate->status == 'available')
-                                                        <span class="body-font-4 mt-1 text-gray-900 d-block">
-                                                            {{ __('i_am_available') }}
-                                                        </span>
-                                                    @endif
-                                                    <div class="">
-                                                        @if (auth('user')->check())
-                                                            {{-- <span class="body-font-4 text-primary-500">{{ __('view_resume') }}
-                                                            <x-svg.arrow-right-icon />
-                                                        </span> --}}
-                                                            {{-- <span class="body-font-4 text-primary-500">{{ __('Book Me') }}
-                                                            <x-svg.arrow-right-icon />
-                                                        </span> --}}
-                                                            <form action="{{ route('company.hire-request') }}"
-                                                                method="POST">
-                                                                @csrf
-                                                                <input type="hidden" name="candidate_id"
-                                                                    value="{{ $candidate->id }}">
-                                                                <button type="submit" class="btn btn-primary bookMeBtn">Book Me</button>
-                                                            </form>
-                                                        @else
-                                                            {{-- <span class="body-font-4 text-primary-500 login_required">{{ __('view_resume')
-                                                            }}
-                                                            <x-svg.arrow-right-icon />
-                                                        </span> --}}
-                                                            <span
-                                                                class="body-font-4 text-primary-500 login_required">{{ __('Book Me') }}
-                                                                {{-- <x-svg.arrow-right-icon /> --}}
-                                                            </span>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <div
-                                                    class="tw-inline-flex tw-justify-center tw-items-center tw-absolute tw-top-3 tw-right-3 tw-text-[#767F8C]">
-                                                    @if ($candidate->already_view)
-                                                        <div data-bs-toggle="tooltip" data-bs-placement="top"
-                                                            title="{{ __('you_have_seen_the_cv_on') }} {{ $candidate->already_views && $candidate->already_views[0] ? $candidate->already_views[0]->view_date_time : '-' }}. After {{ $candidate->already_views && $candidate->already_views[0] ? $candidate->already_views[0]->expired_date : '-' }} {{ __('the_view_count_will_be_reset') }}"
-                                                            class="cursor-pointer ml--10px" id="cv_view">
-                                                            <x-svg.eye-icon fill="#767F8C" />
-                                                        </div>
-                                                    @else
-                                                        <div data-bs-toggle="tooltip" data-bs-placement="top"
-                                                            class="cursor-pointer ml--10px">
-                                                            <div class="d-none" id="cv_view{{ $candidate->id }}">
-                                                                <x-svg.eye-icon fill="#767F8C" />
-                                                            </div>
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </a>
-                                </div>
-                            @endif
-                        @endforeach
-                    </div>
-                @else
-                    <div class="col-md-12">
-                        <div class="card text-center">
-                            <x-not-found message="{{ __('no_data_found') }}" />
-                        </div>
-                    </div>
-                @endif
-
-                @if (request('perpage') != 'all' && $candidates->total() > $candidates->count())
-                    <div class="rt-pt-30">
-                        <nav>
-                            {{ $candidates->links('vendor.pagination.frontend') }}
-                        </nav>
-                    </div>
-                @endif
+    <div class="cw-jobs-portal" id="togglclass1">
+        <div class="container">
+            <div class="cw-jobs-portal__listing-head">
+                <div>
+                    <h2 class="cw-jobs-portal__listing-title">
+                        {{ __('candidates') }}
+                        <span class="cw-jobs-portal__count-badge">
+                            {{ $candidates->total() }} {{ __('candidates') }}
+                        </span>
+                    </h2>
+                    <p class="cw-jobs-portal__listing-sub">{{ __('find_candidates') }}</p>
+                </div>
+                <div class="cw-jobs-portal__view-toggle">
+                    <button type="button" class="cw-jobs-portal__view-btn active" id="nav-home-tab"
+                        data-bs-toggle="tab" data-bs-target="#nav-home" onclick="styleSwitch('box')">
+                        <x-svg.box-icon />
+                    </button>
+                    <button type="button" class="cw-jobs-portal__view-btn" id="nav-profile-tab"
+                        data-bs-toggle="tab" data-bs-target="#nav-profile" onclick="styleSwitch('list')">
+                        <x-svg.list-icon />
+                    </button>
+                </div>
             </div>
-            <!-- For List -->
-            <x-website.candidate.candidate-view-list :candidates="$candidates" />
+
+            <div class="tab-content" id="nav-tabContent">
+                <div class="tab-pane show active" id="nav-home" role="tabpanel" aria-labelledby="nav-home-tab">
+                    <div class="cw-jobs-portal__grid">
+                        @forelse ($candidates as $candidate)
+                            @if (optional($candidate->user)->username != '')
+                                <x-website.candidate.candidate-card :candidate="$candidate" />
+                            @endif
+                        @empty
+                            <div class="tw-col-span-full">
+                                <div class="card text-center">
+                                    <x-not-found message="{{ __('no_data_found') }}" />
+                                </div>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+                <x-website.candidate.candidate-view-list :candidates="$candidates" />
+            </div>
+
+            @if (request('perpage') != 'all' && $candidates->total() > $candidates->count())
+                <div class="cw-jobs-portal__pagination">
+                    {{ $candidates->links('vendor.pagination.frontend') }}
+                </div>
+            @endif
         </div>
-    </div>
-    </div>
-    </div>
     </div>
 
     <div class="rt-spacer-100 rt-spacer-md-50"></div>
@@ -189,9 +103,6 @@
     <!-- Modal -->
     {{-- <x-website.modal.candidate-profile-modal /> --}}
 
-    {{-- Candidate Filter Modal --}}
-    <x-website.modal.candidate-filters-modal :experiences="$experiences" :educations="$educations" :skills="$skills" />
-
     <!-- Find Candidate Id From Here | Please don't remove it Start -->
     <input type="hidden" value="" id="candidate_id">
     <!-- Find Candidate Id From Here | Please don't remove it End -->
@@ -199,8 +110,6 @@
 @endsection
 
 @push('frontend_links')
-    <link rel="stylesheet" href="{{ asset('backend') }}/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="{{ asset('backend') }}/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css">
     <style>
          .bookMeBtn {
             line-height: 1px !important;
@@ -291,20 +200,20 @@
     <script>
         // filter function
         function Filter() {
-            $('#form').submit();
+            $('#candidate_search_form').submit();
         }
         // sorting
         $('#sortby').on('change', function() {
-            $('#form').submit();
+            $('#candidate_search_form').submit();
         })
         // perpage
         $('#perpage').on('change', function() {
-            $('#form').submit();
+            $('#candidate_search_form').submit();
         })
         // filter close
         function FilterClose(name) {
             $('[name="' + name + '"]').val('');
-            $('#form').submit();
+            $('#candidate_search_form').submit();
         }
         // candidate profile modal data by ajax
         function showCandidateProfileModal(username) {
@@ -710,13 +619,6 @@
         $(function() {
             $('[data-toggle="tooltip"]').tooltip()
         })
-
-        //  skilss select2 design
-        $('#skills').select2({
-            theme: 'bootstrap4',
-            tags: true,
-            placeholder: 'Select Skill'
-        });
     </script>
     <script>
         function copyToClipboard(event) {

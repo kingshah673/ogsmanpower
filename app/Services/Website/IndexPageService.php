@@ -84,9 +84,9 @@ class IndexPageService
                 },
             ]);
 
-        $featured_jobs = $this->filterCountryBasedJobs($featured_jobs_query)
+        $featured_jobs = applyCandidateAgeFilter($this->filterCountryBasedJobs($featured_jobs_query))
             ->where('featured', 1)
-            ->whereRaw("FIND_IN_SET('public', job_roles)")
+            ->publicListing()
             ->deadlineActive()
             ->active()
             ->latest()
@@ -95,8 +95,8 @@ class IndexPageService
 
         // If no featured jobs exist → fallback to latest active jobs
         if ($featured_jobs->isEmpty()) {
-            $featured_jobs = $this->filterCountryBasedJobs($featured_jobs_query)
-                ->whereRaw("FIND_IN_SET('public', job_roles)")
+            $featured_jobs = applyCandidateAgeFilter($this->filterCountryBasedJobs($featured_jobs_query))
+                ->publicListing()
                 ->deadlineActive()
                 ->active()
                 ->latest()

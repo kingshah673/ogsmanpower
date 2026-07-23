@@ -5,19 +5,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        @page { size: A4 portrait; margin: {{ !empty($compactPdf) ? '6mm' : '10mm' }}; }
         body {
             font-family: 'DejaVu Sans', sans-serif;
             /* PDF-supported font */
             margin: 0;
             padding: 0px;
-            background-color: #f8f8f8;
+            background-color: {{ !empty($compactPdf) ? '#fff' : '#f8f8f8' }};
+            font-size: {{ !empty($compactPdf) ? '9px' : '12px' }};
         }
 
         .container {
             max-width: 800px;
             margin: 0 auto;
             background: white;
-            padding: 10px;
+            padding: {{ !empty($compactPdf) ? '6px' : '10px' }};
             /* box-shadow: 0 0 5px rgba(0, 0, 0, 0.1); */
             border-radius: 5px;
             border: 2px solid #003366;

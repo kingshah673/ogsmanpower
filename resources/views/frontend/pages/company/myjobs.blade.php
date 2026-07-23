@@ -3,296 +3,240 @@
 @section('title', __('my_jobs'))
 
 @section('main')
-    <style>
-        /* ===== Common Styles ===== */
-        .job-listing-card {
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
-            background: #ffffff;
-            transition: box-shadow 0.3s ease;
-        }
-        .job-listing-card:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
 
-        .job-title {
-            font-weight: 600;
-            font-size: 1.1rem;
-            color: #111827;
-            text-decoration: none;
-            transition: color 0.3s ease;
-        }
-        .job-title:hover {
-            color: #1d4ed8;
-        }
+<div class="dashboard-wrapper seeker-module-page">
+<div class="container">
+<div class="dashboard-right">
 
-        .badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-            display: inline-block;
-        }
-        .badge-success { background-color: #d1fae5; color: #065f46; }
-        .badge-warning { background-color: #fef3c7; color: #92400e; }
-        .badge-danger { background-color: #fee2e2; color: #b91c1c; }
+<x-website.company.employer-page-header
+    :title="__('my_jobs')"
+    subtitle="Manage your job postings, applications and promotions."
+>
+    <x-slot:actions>
+        <a href="{{ route('company.job.create') }}" class="pv-topbar-btn"><i class="fas fa-plus"></i> {{ __('post_a_job') }}</a>
+    </x-slot:actions>
+</x-website.company.employer-page-header>
 
-        /* ===== Actions ===== */
-        .action-btn {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            font-size: 12px;
-            color: #374151;
-            text-decoration: none;
-            margin-right: 12px;
-            transition: transform 0.2s ease, color 0.2s ease;
-        }
-        .action-btn:hover {
-            transform: scale(1.1);
-            color: #1d4ed8;
-        }
-        .action-btn i {
-            font-size: 18px;
-            margin-bottom: 4px;
-        }
+<div class="glass-card">
+<div class="glass-card-body">
 
-        /* ===== Dropdown Menu ===== */
-        .dropdown-menu {
-            min-width: 160px;
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-            padding: 0.5rem 0;
-        }
-        .dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 0.5rem 1rem;
-            color: #374151;
-            transition: background 0.2s ease, color 0.2s ease;
-        }
-        .dropdown-item:hover {
-            background-color: #f0f4f8;
-            color: #1d4ed8;
-        }
+<div class="container-fluid px-0 py-0">
 
-        /* ===== Table ===== */
-        .job-table th, .job-table td {
-            padding: 12px 8px;
-            text-align: left;
-        }
-        .job-table th { font-weight: 600; color: #111827; }
+    <!-- TOP ANALYTICS -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="analytics-card">
+                <small>Total Jobs</small>
+                <h4>{{ $stats['total'] ?? $myJobs->total() }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card">
+                <small>Active Jobs</small>
+                <h4>{{ $stats['active'] ?? 0 }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card">
+                <small>Total Applications</small>
+                <h4>{{ $stats['applications'] ?? 0 }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="promo">
+                <h6>Boost Hiring 🚀</h6>
+                <small>Promote jobs to get more candidates</small>
+                <div class="mt-2">
+                    <a href="#" class="btn btn-light btn-sm">Promote Now</a>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        /* ===== Responsive ===== */
-        .desktop-view { display: none; }
-        .mobile-view { display: block; }
+    <!-- FILTER -->
+    <form id="status-filter" action="{{ route('company.myjob') }}" method="GET" class="d-flex flex-wrap gap-2 mb-4 align-items-end">
+        <div>
+            <label class="small text-muted mb-1 d-block">{{ __('job_status') }}</label>
+            <select name="status" class="form-select">
+                <option value="">{{ __('all') }}</option>
+                <option value="active" @selected(request('status') === 'active')>{{ __('active') }}</option>
+                <option value="pending" @selected(request('status') === 'pending')>{{ __('pending') }}</option>
+                <option value="expired" @selected(request('status') === 'expired')>{{ __('expired') }}</option>
+            </select>
+        </div>
+        <div>
+            <label class="small text-muted mb-1 d-block">{{ __('apply_on') }}</label>
+            <select name="apply_on" class="form-select">
+                <option value="">{{ __('all') }}</option>
+                <option value="app" @selected(request('apply_on') === 'app')>{{ __('app') }}</option>
+                <option value="email" @selected(request('apply_on') === 'email')>{{ __('email') }}</option>
+                <option value="custom_url" @selected(request('apply_on') === 'custom_url')>{{ __('custom_url') }}</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-outline-primary">{{ __('filter') }}</button>
+        @if(request()->hasAny(['status', 'apply_on']))
+            <a href="{{ route('company.myjob') }}" class="btn btn-link">{{ __('clear') }}</a>
+        @endif
+    </form>
 
-        @media(min-width: 768px) {
-            .desktop-view { display: block; }
-            .mobile-view { display: none; }
-        }
-    </style>
-
-    {{-- Desktop Table View --}}
-    <div class="desktop-view container mt-5">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3>{{ __('my_jobs') }} <span class="text-gray-400">({{ $myJobs->total() }})</span></h3>
-            <form id="status-filter" action="{{ route('company.myjob') }}" method="GET" class="d-flex gap-2">
-                <select name="status" class="form-select">
-                    <option value="">{{ __('all') }}</option>
-                    <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>{{ __('active') }}</option>
-                    <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>{{ __('pending') }}</option>
-                    <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>{{ __('expired') }}</option>
-                </select>
-                <select name="apply_on" class="form-select">
-                    <option value="">{{ __('all') }}</option>
-                    <option value="app" {{ request('apply_on') == 'app' ? 'selected' : '' }}>{{ __('app') }}</option>
-                    <option value="email" {{ request('apply_on') == 'email' ? 'selected' : '' }}>{{ __('email') }}</option>
-                    <option value="custom_url" {{ request('apply_on') == 'custom_url' ? 'selected' : '' }}>{{ __('custom_url') }}</option>
-                </select>
-            </form>
+    <form id="bulk-delete-jobs" method="POST" action="{{ route('company.jobs.destroy.selected') }}">
+        @csrf
+        <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+            <label class="mb-0 small">
+                <input type="checkbox" id="select-all-jobs"> Select all on this page
+            </label>
+            <button type="submit" class="btn btn-outline-danger btn-sm" id="bulk-delete-btn" disabled
+                onclick="return confirm('Delete selected jobs permanently? Applications for those jobs will also be removed.');">
+                Delete selected
+            </button>
         </div>
 
-        <table class="table job-table table-hover">
-            <thead>
-                <tr>
-                    <th>{{ __('job') }}</th>
-                    <th>{{ __('status') }}</th>
-                    <th>{{ __('applications') }}</th>
-                    <th>{{ __('action') }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($myJobs as $job)
-                    <tr>
-                        <td>
-                            <a href="{{ route('website.job.details', $job->slug) }}" class="job-title">
+    <!-- JOB LIST -->
+    <div class="row g-4">
+
+        @forelse($myJobs as $job)
+        <div class="col-lg-6">
+            <div class="job-card">
+
+                <!-- TITLE -->
+                <div class="d-flex justify-content-between">
+                    <div class="d-flex gap-2 align-items-start">
+                        <input type="checkbox" class="job-select mt-1" name="ids[]" value="{{ $job->id }}" form="bulk-delete-jobs">
+                        <div>
+                            <a href="{{ route('website.job.details',$job->slug) }}" class="job-title">
                                 {{ $job->title }}
                             </a>
-                            <div class="mt-1 text-gray-500" style="font-size:12px;">
-                                {{ ucfirst($job->job_type->name) }} | {{ $job->days_remaining }} {{ __('remaining') }}
+                            <div class="text-muted small">
+                                {{ ucfirst($job->job_type->name ?? '—') }} • {{ $job->days_remaining }} days left
                             </div>
-                        </td>
-                        <td>
-                            @if($job->status == 'active')
-                                <span class="badge badge-success">{{ __('active') }}</span>
-                            @elseif($job->status == 'pending')
-                                <span class="badge badge-warning">{{ __('pending') }}</span>
-                            @else
-                                <span class="badge badge-danger">{{ __('job_expire') }}</span>
-                            @endif
-                        </td>
-                        <td>{{ $job->applied_jobs_count }}</td>
-                        <td>
-                            <div class="dropdown">
-                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    {{ __('actions') }}
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li>
-                                        <a class="dropdown-item" href="{{ route('website.job.details', $job->slug) }}">
-                                            <i class="fas fa-info-circle"></i> {{ __('view_details') }}
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item" href="{{ route('company.job.application', ['job'=>$job->id]) }}">
-                                            <i class="fas fa-file-alt"></i> {{ __('view_applications') }}
-                                        </a>
-                                    </li>
-                                    @if($job->status == 'active')
-                                        <li>
-                                            <form method="POST" action="{{ route('company.job.make.expire', $job->id) }}">
-                                                @csrf
-                                                <button type="submit" class="dropdown-item">
-                                                    <i class="fas fa-times-circle"></i> {{ __('make_it_expire') }}
-                                                </button>
-                                            </form>
-                                        </li>
-                                    @elseif($job->status == 'expired')
-                                        <li>
-                                            <form method="POST" action="{{ route('company.job.make.active', $job->id) }}">
-                                                @csrf
-                                                <button type="submit" class="dropdown-item">
-                                                    <i class="fas fa-check-circle"></i> {{ __('make_it_active') }}
-                                                </button>
-                                            </form>
-                                        </li>
-                                    @endif
-                                    <li>
-                                        <a class="dropdown-item" href="{{ route('company.job.edit', $job->slug) }}">
-                                            <i class="fas fa-edit"></i> {{ __('edit') }}
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item" href="{{ route('company.promote', $job->slug) }}">
-                                            <i class="fas fa-bullhorn"></i> {{ __('promote') }}
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item" href="{{ route('company.clone', $job->slug) }}">
-                                            <i class="fas fa-copy"></i> {{ __('clone') }}
-                                        </a>
-                                    </li>
-                                </ul>
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="4"><x-website.not-found /></td></tr>
-                @endforelse
-            </tbody>
-        </table>
+                        </div>
+                    </div>
 
-        @if($myJobs->hasPages())
-            <div class="mt-4">
-                {{ $myJobs->links('vendor.pagination.frontend') }}
-            </div>
-        @endif
-    </div>
+                    <!-- STATUS -->
+                    <span class="badge-status {{ $job->status }}">
+                        {{ ucfirst($job->status) }}
+                    </span>
+                </div>
 
-    {{-- Mobile Card View --}}
-    <div class="mobile-view container mt-3">
-        <h4>{{ __('my_jobs') }} <span class="text-gray-400">({{ $myJobs->total() }})</span></h4>
-        @forelse($myJobs as $job)
-            <div class="job-listing-card">
-                <a href="{{ route('website.job.details', $job->slug) }}" class="job-title mb-2 d-block">{{ $job->title }}</a>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>{{ ucfirst($job->job_type->name) }}</span>
-                    <span>{{ $job->days_remaining }} {{ __('remaining') }}</span>
+                <!-- STATS -->
+                <div class="row g-2 mt-3">
+                    <div class="col-4">
+                        <div class="stat-box">
+                            <strong>{{ $job->applied_jobs_count }}</strong>
+                            <small>Applicants</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="stat-box">
+                            <strong>{{ (int) ($job->total_views ?? 0) }}</strong>
+                            <small>Views</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="stat-box">
+                            <strong>{{ $job->conversionRate($job->applied_jobs_count) }}%</strong>
+                            <small>Conversion</small>
+                        </div>
+                    </div>
                 </div>
-                <div class="d-flex justify-content-between mb-2">
-                    @if($job->status == 'active')
-                        <span class="badge badge-success">{{ __('active') }}</span>
-                    @elseif($job->status == 'pending')
-                        <span class="badge badge-warning">{{ __('pending') }}</span>
-                    @else
-                        <span class="badge badge-danger">{{ __('job_expire') }}</span>
-                    @endif
-                    <span>{{ $job->applied_jobs_count }} {{ __('applications') }}</span>
-                </div>
-                <div class="dropdown mt-2">
-                    <button class="btn btn-outline-secondary btn-sm w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        {{ __('actions') }}
+
+                <!-- ACTIONS -->
+                <div class="d-flex flex-wrap gap-2 mt-3">
+
+                    <a href="{{ route('company.job.application',['job'=>$job->id]) }}"
+                       class="btn btn-dark action-btn">
+                        Applications
+                    </a>
+
+                    <a href="{{ route('company.job.edit',$job->slug) }}"
+                       class="btn btn-outline-primary action-btn">
+                        Edit
+                    </a>
+
+                    <a href="{{ route('company.promote',$job->slug) }}"
+                       class="btn btn-outline-warning action-btn">
+                        Promote
+                    </a>
+                    <a href="{{ route('company.job.assign.agency', $job->id) }}"
+                       class="btn btn-outline-success action-btn">
+                       Assign Agency
+                     </a>
+
+                    <a href="{{ route('company.clone',$job->slug) }}"
+                       class="btn btn-outline-secondary action-btn">
+                        Clone
+                    </a>
+
+                    <button type="submit" form="delete-job-{{ $job->id }}"
+                        class="btn btn-outline-danger action-btn"
+                        onclick="return confirm('Delete this job permanently? Its applications will also be removed.');">
+                        Delete
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li>
-                            <a class="dropdown-item" href="{{ route('website.job.details', $job->slug) }}">
-                                <i class="fas fa-info-circle"></i> {{ __('view_details') }}
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{{ route('company.job.application', ['job'=>$job->id]) }}">
-                                <i class="fas fa-file-alt"></i> {{ __('view_applications') }}
-                            </a>
-                        </li>
-                        @if($job->status == 'active')
-                            <li>
-                                <form method="POST" action="{{ route('company.job.make.expire', $job->id) }}">
-                                    @csrf
-                                    <button type="submit" class="dropdown-item">
-                                        <i class="fas fa-times-circle"></i> {{ __('make_it_expire') }}
-                                    </button>
-                                </form>
-                            </li>
-                        @elseif($job->status == 'expired')
-                            <li>
-                                <form method="POST" action="{{ route('company.job.make.active', $job->id) }}">
-                                    @csrf
-                                    <button type="submit" class="dropdown-item">
-                                        <i class="fas fa-check-circle"></i> {{ __('make_it_active') }}
-                                    </button>
-                                </form>
-                            </li>
-                        @endif
-                        <li>
-                            <a class="dropdown-item" href="{{ route('company.job.edit', $job->slug) }}">
-                                <i class="fas fa-edit"></i> {{ __('edit') }}
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{{ route('company.promote', $job->slug) }}">
-                                <i class="fas fa-bullhorn"></i> {{ __('promote') }}
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{{ route('company.clone', $job->slug) }}">
-                                <i class="fas fa-copy"></i> {{ __('clone') }}
-                            </a>
-                        </li>
-                    </ul>
                 </div>
+
             </div>
+        </div>
         @empty
-            <x-website.not-found />
+        <div class="text-center">No Jobs Found</div>
         @endforelse
+
     </div>
+    </form>
+
+    @foreach($myJobs as $job)
+    <form id="delete-job-{{ $job->id }}" method="POST" action="{{ route('company.job.destroy', $job) }}" class="d-none">
+        @csrf
+        @method('DELETE')
+    </form>
+    @endforeach
+
+    <!-- PAGINATION -->
+    <div class="mt-4">
+        {{ $myJobs->links('vendor.pagination.frontend') }}
+    </div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
 @endsection
 
 @section('script')
 <script>
-    $('#status-filter').on('change', function() { this.submit(); });
+    document.getElementById('status-filter')?.addEventListener('change', function (event) {
+        if (event.target && event.target.tagName === 'SELECT') {
+            this.submit();
+        }
+    });
+
+    (function () {
+        var selectAll = document.getElementById('select-all-jobs');
+        var bulkBtn = document.getElementById('bulk-delete-btn');
+        var boxes = function () { return Array.prototype.slice.call(document.querySelectorAll('.job-select')); };
+
+        function syncBulk() {
+            var checked = boxes().filter(function (b) { return b.checked; }).length;
+            if (bulkBtn) bulkBtn.disabled = checked === 0;
+            if (selectAll) {
+                var all = boxes();
+                selectAll.checked = all.length > 0 && checked === all.length;
+                selectAll.indeterminate = checked > 0 && checked < all.length;
+            }
+        }
+
+        selectAll?.addEventListener('change', function () {
+            boxes().forEach(function (b) { b.checked = selectAll.checked; });
+            syncBulk();
+        });
+        document.addEventListener('change', function (e) {
+            if (e.target && e.target.classList.contains('job-select')) syncBulk();
+        });
+        syncBulk();
+    })();
 </script>
 @endsection

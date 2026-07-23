@@ -1,0 +1,66 @@
+/* Jobs listing page — popular tags + card actions */
+.tw-popular-search {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tw-popular-search li {
+    display: inline-flex;
+    cursor: pointer;
+}
+
+.tw-popular-search li a {
+    display: inline-block;
+    padding: 0.4rem 0.9rem;
+    border-radius: 9999px;
+    background: #f1f2f4;
+    color: #474c54;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    line-height: 1.25;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tw-popular-search li:hover a {
+    background: #e7f0fa;
+    color: #0a65cc;
+}
+
+.tw-popular-search li.tw-bg-blue-50 a,
+.tw-popular-search li.tw-text-blue-500 a {
+    background: #eff6ff;
+    color: #0a65cc;
+    font-weight: 600;
+}
+
+.joblist-content .row > h5 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #18191c;
+    margin-bottom: 1.25rem;
+    width: 100%;
+}
+
+.joblist-content .jobcardStyle1 {
+    border: 1px solid #e4e5e8;
+    border-radius: 12px;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.joblist-content .jobcardStyle1:hover {
+    border-color: #c7d7eb;
+    box-shadow: 0 8px 24px rgba(24, 25, 28, 0.08);
+}
+
+.joblist-content .tw-relative.tw-h-full {
+    min-height: 100%;
+}
+
+.joblist-content .tw-relative.tw-h-full > .tw-flex.tw-items-center.tw-absolute {
+    z-index: 5;
+}

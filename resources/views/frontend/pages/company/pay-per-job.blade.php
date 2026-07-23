@@ -752,7 +752,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.ar.min.js
     "></script>
     @endif --}}
-    @include('map::set-leafletmap')
+    @if (config('templatecookie.map_show'))
+        @php $activeMap = $map ?? $setting->default_map; @endphp
+        @if ($activeMap == 'leaflet')
+            @include('map::set-leafletmap')
+        @elseif ($activeMap == 'google-map' && filled($setting->google_map_key))
+            @include('map::set-googlemap')
+        @endif
+    @endif
     <script>
         var max_days = '{{ $setting->job_deadline_expiration_limit }}'
 
@@ -769,8 +776,6 @@
             }
         );
     </script>
-    @include('map::set-googlemap')
-
 
     <script>
         var salary_mode = "{!! old('salary_mode') !!}";

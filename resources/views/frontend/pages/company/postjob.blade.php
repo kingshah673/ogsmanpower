@@ -2,158 +2,134 @@
 @extends('components.website.company.layout.app')
 
 @section('css')
-<style>
-
-/* ===== BACKGROUND ===== */
-body {
-    background: #f3f6fb;
-    font-family: 'Inter', 'Segoe UI', sans-serif;
-}
-
-/* ===== PAGE HEADER ===== */
-.professional-header {
-    background: #ffffff;
-    padding: 30px 40px;
-    border-radius: 16px;
-    margin-bottom: 25px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-}
-
-.professional-header h2 {
-    font-weight: 700;
-    margin-bottom: 5px;
-}
-
-.professional-header p {
-    color: #6b7280;
-    margin: 0;
-}
-
-/* ===== MAIN FORM CARD ===== */
-.post-job-item {
-    background: #ffffff;
-    padding: 40px;
-    border-radius: 18px;
-    box-shadow: 0 15px 45px rgba(0,0,0,0.06);
-}
-
-/* ===== SECTION TITLES ===== */
-.post-job-item h4 {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 18px;
-    color: #111827;
-}
-
-/* ===== INPUTS ===== */
-.form-control,
-.form-select {
-    height: 50px;
-    border-radius: 12px;
-    border: 1px solid #e5e7eb;
-    transition: all 0.25s ease;
-    font-size: 14px;
-}
-
-textarea.form-control {
-    height: auto;
-    padding-top: 12px;
-}
-
-.form-control:focus,
-.form-select:focus {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
-}
-
-/* ===== RADIO CARDS (Apply Type) ===== */
-.radio-check {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    padding: 25px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-.radio-check input[type="radio"] {
-    display: none;
-}
-
-.radio-check:hover {
-    border-color: #2563eb;
-    box-shadow: 0 12px 30px rgba(37,99,235,0.08);
-    transform: translateY(-3px);
-}
-
-.radio-check.checked {
-    border: 2px solid #2563eb;
-    background: #f0f7ff;
-    box-shadow: 0 12px 35px rgba(37,99,235,0.15);
-}
-
-.radio-check.checked::after {
-    content: '';
-    position: absolute;
-    top: 18px;
-    right: 18px;
-    width: 14px;
-    height: 14px;
-    background: #2563eb;
-    border-radius: 50%;
-}
-
-/* ===== CKEDITOR ===== */
-.ck-editor__editable {
-    min-height: 180px;
-    border-radius: 14px !important;
-}
-
-/* ===== BUTTON ===== */
-.btn-primary {
-    background: linear-gradient(135deg,#2563eb,#1d4ed8);
-    border: none;
-    padding: 14px 35px;
-    border-radius: 14px;
-    font-weight: 600;
-    font-size: 15px;
-    box-shadow: 0 12px 35px rgba(37,99,235,0.35);
-    transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 15px 45px rgba(37,99,235,0.45);
-}
-
-</style>
-@endsection
+        <link rel="stylesheet" href="{{ asset('frontend') }}/assets/css/bootstrap-datepicker.min.css">
+        <x-map.leaflet.map_links />
+        <x-map.leaflet.autocomplete_links />
+        @include('map::links')
+        <style>
+            .seeker-settings-page .cw-settings-layout { align-items: start; }
+            .seeker-settings-page .cw-chapter-nav {
+                z-index: 30;
+                align-self: start;
+                max-height: calc(100vh - 6rem);
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+            .seeker-settings-page .cw-settings-content {
+                min-width: 0;
+                width: 100%;
+                overflow: visible;
+                position: relative;
+            }
+            .seeker-settings-page #company-job-form { min-width: 0; }
+            .seeker-settings-page .benefits-tags {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                width: 100%;
+                max-width: 100%;
+            }
+            .seeker-settings-page .benefits-tags label {
+                position: relative;
+                display: inline-flex;
+                align-items: center;
+                margin: 0;
+                cursor: pointer;
+            }
+            .seeker-settings-page .benefits-tags input {
+                position: absolute;
+                opacity: 0;
+                width: 0;
+                height: 0;
+                margin: 0;
+            }
+            .seeker-settings-page .benefits-tags label span {
+                display: inline-block;
+                font-size: 0.8125rem;
+                color: #475569;
+                background: #f8fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 0.5rem 0.75rem;
+                white-space: nowrap;
+                transition: border-color 0.15s, background 0.15s, color 0.15s;
+            }
+            .seeker-settings-page .benefits-tags input:checked + span {
+                color: #1d4ed8;
+                background: #eff6ff;
+                border-color: #2563eb;
+            }
+            .seeker-settings-page .select2-container { max-width: 100%; }
+            .seeker-settings-page .ck-editor__editable_inline { min-height: 280px; }
+            .seeker-settings-page .mymap { border-radius: 10px; }
+            .seeker-settings-page .radio-check {
+                border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem;
+                cursor: pointer; transition: border-color 0.15s, background 0.15s;
+            }
+            .seeker-settings-page .radio-check.checked {
+                border-color: #2563eb; background: #eff6ff;
+            }
+            .seeker-settings-page .radio-check input[type="radio"] { display: none; }
+            .seeker-settings-page .btn-ui {
+                display: inline-flex; align-items: center; gap: 0.5rem;
+                padding: 0.625rem 1.25rem; font-weight: 600; font-size: 0.875rem;
+                color: #fff; background: #2563eb; border: none; border-radius: 8px;
+            }
+            .seeker-settings-page .btn-ui:hover { background: #1d4ed8; color: #fff; }
+            @media (max-width: 991.98px) {
+                .seeker-settings-page .cw-chapter-nav {
+                    position: static;
+                    max-height: none;
+                    display: flex;
+                    flex-wrap: nowrap;
+                    overflow-x: auto;
+                    gap: 0.35rem;
+                }
+                .seeker-settings-page .cw-chapter-nav__label { display: none; }
+                .seeker-settings-page .cw-chapter-link {
+                    flex: 0 0 auto;
+                    white-space: nowrap;
+                    font-size: 0.75rem;
+                }
+            }
+        </style>
+    @endsection
 
 @section('title')
     {{ __('post_job') }}
 @endsection
 
 @section('main')
-    <div class="dashboard-wrapper">
+    <div class="dashboard-wrapper seeker-settings-page">
         <div class="container">
-            <div class="row">
-                {{-- Sidebar --}}
-                {{-- <x-website.company.sidebar /> --}}
-                <div class="col-lg-9">
-                    <div class="dashboard-right tw-ps-0 lg:tw-ps-5">
-                        <div class="dashboard-right-header">
-                            {{-- <span class="sidebar-open-nav">
-                                <i class="ph-list"></i>
-                            </span> --}}
-                        </div>
-                        <div class="professional-header">
-    <h2>Post a New Job</h2>
-    <p>Create a professional job listing and attract top talent worldwide.</p>
-</div>
-                        <form action="{{ route('company.job.store') }}" method="POST" class="rt-from">
+            <div class="dashboard-right">
+
+                <x-website.company.employer-page-header
+                    :title="__('post_job')"
+                    subtitle="Create a professional job listing and attract top talent worldwide."
+                />
+
+                <x-website.company.job-ai-upload />
+
+                <div class="cw-settings-layout">
+                    <x-website.company.job-form-nav />
+
+                    <div class="cw-settings-content">
+                        <form id="company-job-form" action="{{ route('company.job.store') }}" method="POST" class="rt-from">
                             @csrf
-                            <div class="post-job-item rt-mb-15 tw-w-full tw-overflow-hidden">
+                            @if ($errors->any())
+                                <div class="alert alert-danger tw-mb-4" role="alert">
+                                    <strong>{{ __('please_fix_the_following_errors') }}:</strong>
+                                    <ul class="tw-mb-0 tw-mt-2">
+                                        @foreach ($errors->all() as $error)
+                                            <li>{{ $error }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                            <div id="section-job-basic" class="glass-card form-section-anchor">
+                                <div class="glass-card-body">
+                                <h3>{{ __('basic_information') }}</h3>
                                 <div class="row">
                                     {{-- <div class="col-lg-8 rt-mb-20">
                                         <x-forms.label name="job_title" :required="true" class="tw-text-sm tw-mb-2" />
@@ -166,19 +142,16 @@ textarea.form-control {
                                     </div> --}}
                                     <div class="col-lg-8 rt-mb-20">
                                         <x-forms.label name="job_title" :required="true" class="tw-text-sm tw-mb-2" />
-                                        <select id="" name="title" class="select21"
-                                            onchange="toggleCustomInput(this)">
-                                            <option value="" disabled selected>Select one</option>
-                                            <option value="custom">Custom Option</option>
-
-                                            @foreach ($jobtitles as $jobtitle)
-                                                <option
-                                                    value="{{ $jobtitle->name }}">{{ $jobtitle->name }}
-                                                </option>
-                                            @endforeach
+                                        <select name="title" class="cw-ms-select form-control"
+                                            data-cw-lookup="professions"
+                                            data-cw-value="text"
+                                            data-cw-tags="1"
+                                            data-placeholder="Search job title…">
+                                            @php $selectedTitle = old('title'); @endphp
+                                            @if ($selectedTitle)
+                                                <option value="{{ $selectedTitle }}" selected>{{ $selectedTitle }}</option>
+                                            @endif
                                         </select>
-                                        <input type="text" id="custom_product" name="custom_title"
-                                            placeholder="Enter custom title" style="display:none;">
                                         @error('title')
                                             <span class="error invalid-feedback">{{ $message }}</span>
                                         @enderror
@@ -186,12 +159,19 @@ textarea.form-control {
                                     <div class="col-lg-4 rt-mb-20 col-md-4">
                                         <x-forms.label name="Industry" :required="true" class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class=" select2-taggable select2-search form-control @error('category_id') is-invalid @enderror"
-                                            name="category_id">
-                                            @foreach ($jobCategories as $category)
-                                                <option {{ old('category_id') == $category->id ? 'selected' : '' }}
-                                                    value="{{ $category->id }}">{{ $category->name }}</option>
-                                            @endforeach
+                                            class="cw-ms-select form-control @error('category_id') is-invalid @enderror"
+                                            name="category_id"
+                                            data-cw-lookup="industries"
+                                            data-placeholder="Search industry…">
+                                            @php
+                                                $selectedCategoryId = old('category_id');
+                                                $selectedCategory = $selectedCategoryId
+                                                    ? ($jobCategories->firstWhere('id', (int) $selectedCategoryId) ?? null)
+                                                    : null;
+                                            @endphp
+                                            @if ($selectedCategory)
+                                                <option value="{{ $selectedCategory->id }}" selected>{{ $selectedCategory->name }}</option>
+                                            @endif
                                         </select>
                                         @error('category_id')
                                             <span class="error invalid-feedback">{{ $message }}</span>
@@ -202,9 +182,10 @@ textarea.form-control {
                                             ({{ __('saerch_or_write_tag_and_hit_enter') }})
                                         </x-forms.label>
 
-                                        <select
-                                            class=" rt-selectactive select2-taggable form-control @error('tags') is-invalid @enderror"
-                                            name="tags[]" multiple>
+                                        <select id="tagsSelect"
+                                            class="cw-ms-select form-control @error('tags') is-invalid @enderror"
+                                            name="tags[]" multiple
+                                            data-cw-lookup="tags" data-cw-tags="1" data-placeholder="Search or add tags…">
                                             @foreach ($tags as $tag)
                                                 <option
                                                     {{ old('tags') ? (in_array($tag->id, old('tags')) ? 'selected' : '') : '' }}
@@ -218,21 +199,28 @@ textarea.form-control {
                                     <div class="col-lg-4 rt-mb-20 col-md-4">
                                         <x-forms.label name="job_role" :required="true" class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class=" select2-taggable select2-search form-control @error('role_id') is-invalid @enderror"
-                                            name="role_id">
-                                            @foreach ($roles as $role)
-                                                <option {{ old('role_id') == $role->id ? 'selected' : '' }}
-                                                    value="{{ $role->id }}">{{ $role->name }}</option>
-                                            @endforeach
+                                            class="cw-ms-select form-control @error('role_id') is-invalid @enderror"
+                                            name="role_id" data-cw-lookup="job_roles" data-placeholder="Select job role…">
+                                            @php
+                                                $selectedRoleId = old('role_id');
+                                                $selectedRole = $selectedRoleId
+                                                    ? ($roles->firstWhere('id', (int) $selectedRoleId) ?? null)
+                                                    : null;
+                                            @endphp
+                                            @if ($selectedRole)
+                                                <option value="{{ $selectedRole->id }}" selected>{{ $selectedRole->name }}</option>
+                                            @endif
                                         </select>
                                         @error('role_id')
                                             <span class="error invalid-feedback">{{ $message }}</span>
                                         @enderror
                                     </div>
                                 </div>
+                                </div>
                             </div>
-                            <div class="post-job-item rt-mb-15 tw-w-full tw-overflow-hidden">
-                                <h4 class="f-size-18 ft-wt-5 rt-mb-20 lh-1">{{ __('salary') }}</h4>
+                            <div id="section-job-salary" class="glass-card form-section-anchor">
+                                <div class="glass-card-body">
+                                <h3>{{ __('salary') }}</h3>
                                 <div class="tw-flex tw-gap-5 mb-3">
                                     <div
                                         class="ll-radio tw-flex tw-items-center tw-border tw-border-gray-200 tw-rounded tw-ps-1">
@@ -254,11 +242,11 @@ textarea.form-control {
                                         <div class="rt-mb-20 col-md-8" >
                                             <x-forms.label name="Currency Code" :required="true" class="tw-text-sm tw-mb-2" />
                                             <div class="position-relative">
-                                                <select name="currency" id="currency" class="block w-28 border-gray-300 rounded-md shadow-sm">
+                                                <select name="currency" id="currency" class="cw-static-select form-control w-100">
                                                     @php
                                                         $currencies = ['USD' => 'USD ($)', 'EUR' => 'EUR (€)', 'GBP' => 'GBP (£)', 'PKR' => 'PKR (₨)',
                                                                        'JPY' => 'JPY (¥)', 'AED' => 'AED (د.إ)', 'SAR' => 'SAR (﷼)', 'QAR' => 'QAR (ر.ق)',
-                                                                       'KWD' => 'KWD (د.ك)', 'OMR' => 'OMR (﷼)', 'BHD' => 'BHD (ب.د)'];
+                                                                       'KWD' => 'KWD (د.ك)', 'OMR' => 'OMR (﷼)', 'BHD' => 'BHD (ب.د)', 'TRY' => 'TRY (ب.د)'];
                                                     @endphp
                                                     @foreach ($currencies as $code => $label)
                                                     <option value="{{ $code }}" >
@@ -317,7 +305,7 @@ textarea.form-control {
                                         <x-forms.label name="{{ __('salary_type') }}" :required="true"
                                             class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class="rt-selectactive form-control @error('salary_type') is-invalid @enderror "
+                                            class="cw-static-select form-control @error('salary_type') is-invalid @enderror"
                                             name="salary_type">
                                             @foreach ($salary_types as $type)
                                                 <option {{ old('salary_type') == $type->id ? 'selected' : '' }}
@@ -331,16 +319,18 @@ textarea.form-control {
                                         @enderror
                                     </div>
                                 </div>
+                                </div>
                             </div>
 
 
-                            <div class="post-job-item rt-mb-15 tw-w-full tw-overflow-hidden">
-                                <h4 class="f-size-18 ft-wt-5 rt-mb-20 lh-1">{{ __('advance_information') }}</h4>
+                            <div id="section-job-requirements" class="glass-card form-section-anchor">
+                                <div class="glass-card-body">
+                                <h3>{{ __('advance_information') }}</h3>
                                 <div class="row">
                                     <div class="col-lg-4 col-md-6 rt-mb-20">
-                                        <x-forms.label name="education" :required="true" class="tw-text-sm tw-mb-2" />
+                                        <x-forms.label name="education" :required="false" class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class="select2-taggable form-control @error('education') is-invalid @enderror "
+                                            class="cw-static-select form-control @error('education') is-invalid @enderror"
                                             name="education">
                                             @foreach ($educations as $education)
                                                 <option {{ old('education') == $education->id ? 'selected' : '' }}
@@ -360,7 +350,7 @@ textarea.form-control {
                                     <div class="col-lg-4 col-md-6 rt-mb-20">
                                         <x-forms.label name="experience" :required="true" class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class="select2-taggable form-control @error('experience') is-invalid @enderror "
+                                            class="cw-static-select form-control @error('experience') is-invalid @enderror"
                                             name="experience">
                                             @foreach ($experiences as $experience)
                                                 <option {{ old('experience') == $experience->id ? 'selected' : '' }}
@@ -379,7 +369,7 @@ textarea.form-control {
                                     <div class="col-lg-4 col-md-6 rt-mb-20">
                                         <x-forms.label name="job_type" :required="true" class="tw-text-sm tw-mb-2" />
                                         <select
-                                            class="rt-selectactive form-control @error('job_type') is-invalid @enderror "
+                                            class="cw-static-select form-control @error('job_type') is-invalid @enderror"
                                             name="job_type">
                                             @foreach ($job_types as $job_type)
                                                 <option {{ old('job_type') == $job_type->id ? 'selected' : '' }}
@@ -394,7 +384,7 @@ textarea.form-control {
                                     </div>
                                     <div class="col-md-6">
                                         <x-forms.label name="Minimum Age" for="min_age" />
-                                        <select name="min_age" class="form-control select2bs4 " id="min_age">
+                                        <select name="min_age" class="cw-static-select form-control" id="min_age">
                                             <option value="" selected disabled>Select Minimum Age</option>
                                             @for ($i = 18; $i <= 60; $i++)
                                                 <option {{ $i == old('min_age') ? 'selected' : '' }}
@@ -411,7 +401,7 @@ textarea.form-control {
                                     <div class="col-md-6">
                                         <x-forms.label name="Maximum Age" for="max_age" />
                                         <select name="max_age"
-                                            class="form-control select2bs4 @error('max_age') is-invalid @enderror"
+                                            class="cw-static-select form-control @error('max_age') is-invalid @enderror"
                                             id="max_age">
                                             <option value="" selected disabled>Select Maximum Age</option>
                                             @for ($i = 18; $i <= 60; $i++)
@@ -433,7 +423,7 @@ textarea.form-control {
                                     </div>
                                     <div class="col-md-6">
                                         <x-forms.label name="gender" for="gender" />
-                                        <select name="gender" class="form-control select2bs4" id="gender">
+                                        <select name="gender" class="cw-static-select form-control" id="gender">
                                             <option value="" selected disabled>Select Gender </option>
                                             <option value="male">Male </option>
                                             <option value="female">Female </option>
@@ -484,8 +474,7 @@ textarea.form-control {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="row">
+                            <div class="row mt-2" id="section-job-location">
                                 @if (config('templatecookie.map_show'))
                                     <div class="col-12 rt-mb-15">
                                         @php
@@ -581,8 +570,11 @@ textarea.form-control {
                                     </div>
                                 @endif
                             </div>
-                            <div class="post-job-item rt-mb-32 tw-w-full tw-overflow-hidden">
-                                <h4 class="f-size-18 ft-wt-5 rt-mb-20 lh-1">{{ __('benefits') }}</h4>
+                                </div>
+                            </div>
+                            <div id="section-job-benefits" class="glass-card form-section-anchor">
+                                <div class="glass-card-body">
+                                <h3>{{ __('benefits') }}</h3>
                                 <div class="benefits-tags" id="benefit_list">
                                     @foreach ($benefits as $benefit)
                                         <label for="benefit_{{ $benefit->id }}">
@@ -620,11 +612,14 @@ textarea.form-control {
                                         </button>
                                     </div>
                                 </div>
+                                </div>
                             </div>
-                            <div class="col-12 rt-mb-20 ">
-                                <x-forms.label name="skills" :required="false" />
+                            <div id="section-job-skills" class="glass-card form-section-anchor">
+                                <div class="glass-card-body">
+                                <h3>{{ __('skills') }}</h3>
                                 <select id="skills" name="skills[]"
-                                    class="select2-taggable form-control @error('skills') is-invalid @enderror" multiple>
+                                    class="cw-ms-select form-control @error('skills') is-invalid @enderror" multiple
+                                    data-cw-lookup="skills" data-cw-tags="1" data-placeholder="Search or add skills…">
                                     @foreach ($skills as $skill)
                                         <option
                                             {{ old('skills') ? (in_array($skill->id, old('skills')) ? 'selected' : '') : '' }}
@@ -632,35 +627,40 @@ textarea.form-control {
                                     @endforeach
                                 </select>
                                 @error('skills')
-                                    <span class="invalid-feedback" role="alert">{{ __($message) }}</span>
+                                    <span class="invalid-feedback d-block" role="alert">{{ __($message) }}</span>
                                 @enderror
+                                </div>
                             </div>
-                            <div class="col-lg-6 mb-3" id="dynamic-inputs">
+                            @if ($dynamicInputs->isNotEmpty())
+                            <div class="glass-card form-section-anchor">
+                                <div class="glass-card-body" id="dynamic-inputs">
+                                <h3>{{ __('Additional Fields') }}</h3>
+                                <div class="row">
                                 @foreach ($dynamicInputs as $index => $input)
-                                    <div class="form-group">
+                                    <div class="col-lg-6 mb-3">
                                         <label
                                             for="dynamic_inputs_{{ $input->id }}">{{ ucwords(str_replace('_', ' ', $input->attribute_name)) }}</label>
                                         <input type="text" name="dynamic_inputs[{{ $index }}][value]"
                                             class="form-control" value="{{ $input->attribute_value }}"
                                             placeholder="{{ ucwords(str_replace('_', ' ', $input->attribute_name)) }}">
-
-
-
                                         @error('dynamic_inputs.' . $index . '.value')
-                                            <div class="invalid-feedback">{{ $message }}</div>
+                                            <div class="invalid-feedback d-block">{{ $message }}</div>
                                         @enderror
-
                                         <input type="hidden" name="dynamic_inputs[{{ $index }}][id]"
                                             value="{{ $input->id }}">
-
                                     </div>
                                 @endforeach
+                                </div>
+                                </div>
                             </div>
-                            <div class="post-job-item rt-mb-32 tw-w-full tw-overflow-hidden">
-                                <h4 class="f-size-18 ft-wt-5 tw-mb-3 lh-1">
+                            @endif
+                            <div id="section-job-description" class="glass-card form-section-anchor">
+                                <div class="glass-card-body">
+                                <h3>
                                     {{ __('job_description') }}
                                     <span class="form-label-required text-danger">*</span>
-                                </h4>
+                                </h3>
+                                <p class="text-muted tw-text-sm tw-mb-2">{{ __('At least 30 characters of plain text (formatting does not count).') }}</p>
                                 <div class="col-md-12">
                                     <textarea id="image_ckeditorx" class="form-control  @error('description') is-invalid @enderror" name="description">{{ old('description') }}
                                     </textarea>
@@ -668,13 +668,56 @@ textarea.form-control {
                                         <span class="error invalid-feedback">{{ $message }}</span>
                                     @enderror
                                 </div>
+                                </div>
+                            </div>
+
+                            <div class="glass-card form-section-anchor">
+                                <div class="glass-card-body">
+                                <h3>
+                                    العنوان بالعربية
+                                    <small class="text-muted fw-normal" style="font-size:13px">(Arabic Job Title — Optional)</small>
+                                </h3>
+                                <div class="col-md-12">
+                                    <input type="text"
+                                           name="title_ar"
+                                           value="{{ old('title_ar') }}"
+                                           class="form-control @error('title_ar') is-invalid @enderror"
+                                           placeholder="مثال: مهندس برمجيات"
+                                           dir="rtl"
+                                           style="text-align:right">
+                                    @error('title_ar')
+                                        <span class="error invalid-feedback">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                                </div>
+                            </div>
+
+                            <div class="glass-card form-section-anchor">
+                                <div class="glass-card-body">
+                                <h3>
+                                    وصف الوظيفة بالعربية
+                                    <small class="text-muted fw-normal" style="font-size:13px">(Arabic Description — Optional)</small>
+                                </h3>
+                                <div class="col-md-12">
+                                    <textarea name="description_ar"
+                                              class="form-control @error('description_ar') is-invalid @enderror"
+                                              rows="6"
+                                              dir="rtl"
+                                              style="text-align:right; font-family:inherit"
+                                              placeholder="اكتب وصف الوظيفة باللغة العربية هنا...">{{ old('description_ar') }}</textarea>
+                                    @error('description_ar')
+                                        <span class="error invalid-feedback">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                                </div>
                             </div>
 
                             {{-- Additional Questions --}}
                             @if (currentCompany()->question_feature_enable)
                                 <div x-data="appQuestion()" x-init="select2Alpine"
-                                    class="post-job-item rt-mb-15 tw-w-full tw-overflow-hidden ">
-                                    <h4 class="f-size-18 ft-wt-5 rt-mb-20 lh-1">{{ __('add_screening_questions') }}</h4>
+                                    class="glass-card form-section-anchor">
+                                    <div class="glass-card-body">
+                                    <h3>{{ __('add_screening_questions') }}</h3>
                                     <div class="row">
                                         <div class="rt-mb-20">
                                             <div class="col-lg-12">
@@ -761,15 +804,17 @@ textarea.form-control {
                                             </template>
                                         </ul>
                                     </div>
+                                    </div>
                                 </div>
                             @endif
 
-                            <div class="row tw-mb-8">
+                            <div id="section-job-apply" class="glass-card form-section-anchor">
+                                <div class="glass-card-body">
+                                <h3>{{ __('apply_job_on') }}</h3>
+                            <div class="row tw-mb-0">
                                 <div class="col-12">
                                     <div class="applied-job-on">
                                         <div class="row">
-                                            <h2>{{ __('apply_job_on') }}:</h2>
-                                            <!-- apply_on -->
                                             <div id="applied_on_app"
                                                 class="radio-check col-lg-4 d-flex {{ old('apply_on') === 'app' ? 'checked' : '' }}"
                                                 onclick="RadioChecked('app')">
@@ -845,78 +890,42 @@ textarea.form-control {
                                     </div>
                                 </div>
                             </div>
-                            <div class="post-job-item rt-mb-15 tw-w-full tw-overflow-hidden">
-                                <button type="submit" class="btn btn-primary rt-mr-10">
-                                    <span class="button-content-wrapper ">
-                                        <span class="button-icon align-icon-right">
-                                            <i class="ph-arrow-right"></i>
-                                        </span>
-                                        <span class="button-text">
-                                            {{ __('post_job') }}
-                                        </span>
-                                    </span>
+                                </div>
+                            </div>
+                            <div class="glass-card">
+                                <div class="glass-card-body text-end">
+                                <button type="submit" class="btn-ui">
+                                    <i class="ph-arrow-right"></i>
+                                    {{ __('post_job') }}
                                 </button>
+                            </div>
                             </div>
                         </form>
                     </div>
                 </div>
             </div>
         </div>
-    @endsection
-
-    @section('css')
-        <link rel="stylesheet" href="{{ asset('frontend') }}/assets/css/bootstrap-datepicker.min.css">
-
-        {{-- @if (app()->getLocale() == 'ar')
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.ar.min.js
-    "></script>
-    @endif --}}
-        <x-map.leaflet.map_links />
-        <x-map.leaflet.autocomplete_links />
-        @include('map::links')
-        <style>
-            .ck-editor__editable_inline {
-                min-height: 300px;
-            }
-
-            .mymap {
-                border-radius: 12px;
-            }
-
-            .mt-n-11 {
-                margin-top: -11px;
-            }
-
-            .custom-checkbox-wrap .main input:checked~.custom-checkbox:after {
-                left: 8% !important;
-            }
-        </style>
-    @endsection
+    </div>
+@endsection
 
     @section('frontend_scripts')
+        <script>window.cwSettingsLookupUrl = @json(url('/company/job-form/lookup'));</script>
+        <script src="{{ asset('js/candidate-settings-select2.js') }}?v={{ @filemtime(public_path('js/candidate-settings-select2.js')) ?: '1' }}"></script>
+        <script src="{{ asset('js/company-job-form.js') }}?v={{ @filemtime(public_path('js/company-job-form.js')) ?: '1' }}"></script>
         <script>
             function toggleCustomInput(select) {
                 const customInput = document.getElementById('custom_product');
+                if (!customInput) return;
                 if (select.value === 'custom') {
                     customInput.style.display = 'block';
-                    customInput.value = ''; // Clear the custom input if 'Custom Option' is selected
+                    customInput.value = '';
                 } else {
                     customInput.style.display = 'none';
-                    customInput.value = ''; // Clear the custom input if another option is selected
+                    customInput.value = '';
                 }
             }
         </script>
         @livewireScripts
-        <script>
-            $(document).ready(function() {
-                $('.select21').select2();
-            });
-            window.addEventListener('render-select2', event => {
-                console.log('fired');
-                $('.select21').select2();
-            })
-        </script>
-        @stack('js')
         <script src="{{ asset('frontend/assets/js/bootstrap-datepicker.min.js') }}"></script>
         <script defer src="{{ asset('backend/js/alpine.min.js') }}"></script>
 
@@ -1036,46 +1045,21 @@ textarea.form-control {
         </script>
 
 
-        <script>
-            ClassicEditor
-                .create(document.querySelector('#image_ckeditorx'), {
-                    ckfinder: {
-                        uploadUrl: "{{ route('ckeditor.upload', ['_token' => csrf_token()]) }}"
-                    },
-                })
-                .then(editor => {
-                    editor.model.document.on('change:data', () => {
-                        const content = editor.getData();
-                        // Regular expression to match numbers and email addresses
-                        const invalidPattern = /\b\d+\b|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-
-                        if (invalidPattern.test(content)) {
-                            // Remove invalid content
-                            const sanitizedContent = content.replace(invalidPattern, '');
-                            editor.setData(sanitizedContent);
-                        }
-                    });
-                })
-                .catch(error => {
-                    console.error(error);
-                });
-
-
-            // ClassicEditor
-            //     .create(document.querySelector('#image_ckeditor_2'), {
-            //         ckfinder: {
-            //             uploadUrl: "{{ route('ckeditor.upload', ['_token' => csrf_token()]) }}"
-            //         },
-            //     })
-            //     .catch(error => {
-            //         console.error(error);
-            //     });
-        </script>
+        {{-- CKEditor initialized in frontend/partials/scripts.blade.php (#image_ckeditorx) --}}
         @if (app()->getLocale() == 'ar')
             <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.ar.min.js
                                                                                     "></script>
         @endif
-        @include('map::set-leafletmap')
+        @if (config('templatecookie.map_show'))
+            @php $activeMap = $map ?? $setting->default_map; @endphp
+            @if ($activeMap == 'leaflet')
+                @include('map::set-leafletmap')
+            @elseif ($activeMap == 'google-map' && filled($setting->google_map_key))
+                @include('map::set-googlemap')
+            @endif
+        @endif
+
+
         <script>
             var max_days = '{{ $setting->job_deadline_expiration_limit }}'
 
@@ -1094,7 +1078,6 @@ textarea.form-control {
                 }
             );
         </script>
-        @include('map::set-googlemap')
 
 
         <script>
@@ -1209,4 +1192,72 @@ textarea.form-control {
                 });
             }
         </script>
+        <script>
+
+function handleJobAI(select) {
+
+    let slug = select.value;
+
+    if (!slug) return;
+
+    /* ========================
+       FETCH AI TEMPLATE
+    ======================== */
+    fetch(`/ai/job-template-by-slug/${slug}`)
+    .then(res => res.json())
+    .then(data => {
+
+        if (!data) return;
+
+        /* ================= CATEGORY AUTO SELECT ================= */
+        let categorySelect = document.getElementById('categorySelect');
+
+        if (categorySelect && data.category_id) {
+            categorySelect.value = data.category_id;
+            $(categorySelect).trigger('change');
+        }
+
+        /* ================= SALARY ================= */
+        document.querySelector('[name="min_salary"]').value = data.min_salary || '';
+        document.querySelector('[name="max_salary"]').value = data.max_salary || '';
+
+        /* ================= EXPERIENCE ================= */
+        let exp = document.getElementById('experienceSelect');
+        if (exp && data.experience) {
+            exp.value = data.experience;
+            $(exp).trigger('change');
+        }
+
+        /* ================= TAGS ================= */
+        let tagSelect = $('#tagsSelect');
+        tagSelect.val(null).trigger('change');
+
+        if (data.tags) {
+            data.tags.forEach(tag => {
+                let option = new Option(tag, tag, true, true);
+                tagSelect.append(option).trigger('change');
+            });
+        }
+
+        /* ================= SKILLS ================= */
+        let skillSelect = $('#skills');
+        skillSelect.val(null).trigger('change');
+
+        if (data.skills) {
+            data.skills.forEach(skill => {
+                let option = new Option(skill, skill, true, true);
+                skillSelect.append(option).trigger('change');
+            });
+        }
+
+        /* ================= CKEDITOR ================= */
+        if (window.editorInstance && data.description) {
+            window.editorInstance.setData(data.description);
+        }
+
+    });
+
+}
+
+</script>
     @endsection

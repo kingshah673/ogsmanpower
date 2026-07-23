@@ -399,15 +399,22 @@ class SettingsController extends Controller
                 (new CurrencyController)->defaultCurrency($request);
             }
 
-            // setting update
-            $this->setting->update([
+            // setting update (only columns that exist on this DB)
+            $payload = [
                 'email_verification' => $request->email_verification ? true : false,
                 'employer_auto_activation' => $request->employer_auto_activation ? true : false,
                 'candidate_account_auto_activation' => $request->candidate_account_auto_activation ? true : false,
                 'job_auto_approved' => $request->job_approval ? true : false,
                 'edited_job_auto_approved' => $request->edited_job_approval ? true : false,
                 'currency_switcher' => $request->currency_switcher,
-            ]);
+            ];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('settings', 'whatsapp_otp_verification')) {
+                $payload['whatsapp_otp_verification'] = $request->whatsapp_otp_verification ? true : false;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('settings', 'email_otp_verification')) {
+                $payload['email_otp_verification'] = $request->email_otp_verification ? true : false;
+            }
+            $this->setting->update($payload);
 
             return redirect()
                 ->back()

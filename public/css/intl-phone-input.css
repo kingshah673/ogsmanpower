@@ -1,0 +1,45 @@
+/* intl-tel-input + Bootstrap form-control integration */
+.fromGroup .iti,
+.linkedin-field .iti,
+.form-group .iti,
+.mb-3 .iti,
+.mb-4 .iti {
+    display: block;
+    width: 100%;
+}
+
+.iti.inti-phone-wide {
+    width: 100%;
+}
+
+.intl-phone-input.form-control,
+.phonecode.form-control,
+input.intl-phone-input {
+    width: 100%;
+}
+
+.iti--separate-dial-code .iti__selected-flag {
+    background: #fff;
+    border-radius: 8px 0 0 8px;
+}
+
+.iti--allow-dropdown .iti__flag-container:hover .iti__selected-flag {
+    background: #f8fafc;
+}
+
+.iti__country-list {
+    z-index: 1060;
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+}
+
+.intl-phone-hint {
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.intl-phone-error,
+#validationMessage {
+    display: none;
+    font-size: 13px;
+}

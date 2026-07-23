@@ -23,8 +23,8 @@ class RedirectIfAuthenticated
                 }
                 break;
             default:
-                if (Auth::guard($guard)->check()) {
-                    return redirect('/');
+                if (Auth::guard('user')->check()) {
+                    return redirect(user_home_route());
                 }
                 break;
         }

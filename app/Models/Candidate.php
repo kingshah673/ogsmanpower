@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Modules\Language\Entities\Language;
 use Modules\Location\Entities\Country;
 
@@ -20,6 +21,7 @@ class Candidate extends Model
     protected $casts = [
         'date_of_birth' => 'datetime',
         'allow_in_search' => 'boolean',
+        'public_code_meta' => 'array',
     ];
 
     protected static function booted()
@@ -42,6 +44,55 @@ class Candidate extends Model
         }
 
         return asset($photo);
+    }
+
+    public function getBirthDateAttribute($value)
+    {
+        // Support both 'birth_date' column and legacy 'dob' column
+        return $value ?? $this->getRawOriginal('dob') ?? null;
+    }
+
+    /**
+     * Seeker age for job age-range matching (profile age column or birth date).
+     */
+    public function resolvedAge(): ?int
+    {
+        $attrs = $this->getAttributes();
+
+        if (array_key_exists('age', $attrs) && filled($attrs['age']) && (int) $attrs['age'] > 0) {
+            return (int) $attrs['age'];
+        }
+
+        $birth = $this->birth_date;
+        if (! filled($birth)) {
+            return null;
+        }
+
+        try {
+            $age = Carbon::parse($birth)->age;
+
+            return $age > 0 ? $age : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Whether this seeker fits a job's min/max age (when the job enforces age).
+     */
+    public function fitsJobAgeRange(Job $job): bool
+    {
+        return $job->acceptsCandidateAge($this->resolvedAge());
+    }
+
+    public function getCountryAttribute($value)
+    {
+        // Raw DB column wins if populated
+        if ($value) {
+            return $value;
+        }
+        // Fall back to the related Country model name
+        return $this->expected_country?->name ?? null;
     }
 
     public function getFullAddressAttribute()
@@ -71,32 +122,253 @@ class Candidate extends Model
 
     public function calculateProfileCompletion()
     {
-        $totalFields = 18;
-        $completed = 0;
+        $sections = $this->profileCompletionSections();
+        $total = count($sections);
+        $done = count(array_filter($sections, fn ($s) => $s['complete']));
 
-        if ($this->user_id) $completed++;
-        if ($this->profession_id) $completed++;
-        if ($this->experience_id) $completed++;
-        if ($this->education_id) $completed++;
-        if ($this->title) $completed++;
-        if ($this->gender) $completed++;
-        if ($this->website) $completed++;
+        return $total > 0 ? (int) round(($done / $total) * 100) : 0;
+    }
 
-        // check real database column
-        if ($this->getRawOriginal('photo')) $completed++;
+    /**
+     * Profile sections used for the completion bar (matches settings UI).
+     *
+     * @return array<int, array{key: string, label: string, hint: string, anchor: string, complete: bool}>
+     */
+    public function profileCompletionSections(): array
+    {
+        $jr = JobRequirement::where('candidate_id', $this->id)->first();
+        $jobIds = cw_json_array($jr?->jobs);
+        $industryIds = cw_json_array($jr?->industries);
 
-        if ($this->resume_format) $completed++;
-        if ($this->bio) $completed++;
-        if ($this->marital_status) $completed++;
-        if ($this->birth_date) $completed++;
-        if ($this->address) $completed++;
-        if ($this->district) $completed++;
-        if ($this->region) $completed++;
-        if ($this->country_id) $completed++;
-        if ($this->status) $completed++;
-        if ($this->available_in) $completed++;
+        $sections = [
+            [
+                'key' => 'basic',
+                'label' => 'Basic information',
+                'hint' => $this->basicInfoHint(),
+                'anchor' => 'basic-info-sec',
+                'complete' => $this->hasBasicInfo(),
+            ],
+            [
+                'key' => 'location',
+                'label' => 'Location',
+                'hint' => 'Select your country, state/region, and city in Basic Information.',
+                'anchor' => 'basic-info-sec',
+                'complete' => $this->hasLocation(),
+            ],
+            [
+                'key' => 'photo',
+                'label' => 'Profile photo',
+                'hint' => 'Upload a profile picture in Basic Information.',
+                'anchor' => 'basic-info-sec',
+                'complete' => filled($this->getRawOriginal('photo')),
+            ],
+            [
+                'key' => 'passport',
+                'label' => 'Passport details',
+                'hint' => 'Add passport number, issue/expiry dates, and place of issue in Basic Information.',
+                'anchor' => 'basic-info-sec',
+                'complete' => filled($this->passport_number),
+            ],
+            [
+                'key' => 'cv',
+                'label' => 'CV / Resume file',
+                'hint' => 'Upload your CV using Smart Profile Auto-Builder at the top of Settings.',
+                'anchor' => 'cv-upload-sec',
+                'complete' => $this->hasCvOnFile(),
+            ],
+            [
+                'key' => 'summary',
+                'label' => 'Professional summary',
+                'hint' => 'Write a short bio in the Summary section.',
+                'anchor' => 'pro-details-sec',
+                'complete' => filled(strip_tags((string) ($this->bio ?? ''))),
+            ],
+            [
+                'key' => 'skills',
+                'label' => 'Skills',
+                'hint' => 'Add your skills in the Skills section.',
+                'anchor' => 'skills-sec',
+                'complete' => $this->skills()->exists(),
+            ],
+            [
+                'key' => 'languages',
+                'label' => 'Languages',
+                'hint' => 'Add languages you speak in the Language section.',
+                'anchor' => 'languages-sec',
+                'complete' => $this->languages()->exists(),
+            ],
+            [
+                'key' => 'experience',
+                'label' => 'Work experience',
+                'hint' => 'Add at least one work experience entry.',
+                'anchor' => 'work-exp-sec',
+                'complete' => $this->experiences()->exists(),
+            ],
+            [
+                'key' => 'education',
+                'label' => 'Education history',
+                'hint' => 'Add at least one education record (or set education level in Basic Information).',
+                'anchor' => 'work-exp-sec',
+                'complete' => $this->educations()->exists() || (bool) $this->education_id,
+            ],
+            [
+                'key' => 'contact',
+                'label' => 'Contact details',
+                'hint' => 'Add phone number and email in Contact Setting.',
+                'anchor' => 'contact-sec',
+                'complete' => $this->hasContactInfo(),
+            ],
+            [
+                'key' => 'job_preferences',
+                'label' => 'Job requirements',
+                'hint' => $this->jobPreferencesHint($jr, $jobIds, $industryIds),
+                'anchor' => 'job-requirements-sec',
+                'complete' => $this->hasJobPreferences(),
+            ],
+        ];
 
-        return round(($completed / $totalFields) * 100);
+        return $sections;
+    }
+
+    /**
+     * Incomplete sections only — for “complete your profile” prompts.
+     *
+     * @return array<int, array{key: string, label: string, hint: string, anchor: string, complete: bool}>
+     */
+    public function profileCompletionMissing(): array
+    {
+        return array_values(array_filter(
+            $this->profileCompletionSections(),
+            fn ($section) => ! $section['complete']
+        ));
+    }
+
+    protected function jobPreferencesHint(?JobRequirement $jr, array $jobIds, array $industryIds): string
+    {
+        $parts = [];
+        if (! $jr || ! filled($jr->region)) {
+            $parts[] = 'select a region';
+        }
+        if (! $jr || $jr->salary === null || $jr->salary === '') {
+            $parts[] = 'enter expected salary';
+        }
+        if (count($jobIds) === 0) {
+            $parts[] = 'add job titles (at least one)';
+        }
+        if (count($industryIds) === 0) {
+            $parts[] = 'add industries (at least one)';
+        }
+
+        if ($parts === []) {
+            return 'Complete job titles, industries, region, and salary in Job Requirements.';
+        }
+
+        return 'In Job Requirements: '.implode(', ', $parts).'.';
+    }
+
+    protected function basicInfoHint(): string
+    {
+        $parts = [];
+        if (! $this->profession_id) {
+            $parts[] = 'profession';
+        }
+        if (! $this->experience_id) {
+            $parts[] = 'experience level';
+        }
+        if (! $this->education_id) {
+            $parts[] = 'education level';
+        }
+        if (! filled($this->gender)) {
+            $parts[] = 'gender';
+        }
+        if (! filled($this->marital_status)) {
+            $parts[] = 'marital status';
+        }
+        if (! filled($this->birth_date)) {
+            $parts[] = 'date of birth';
+        }
+        if (! filled($this->status)) {
+            $parts[] = 'availability';
+        }
+
+        if ($parts === []) {
+            return 'Open Basic Information, confirm all fields, and click Save.';
+        }
+
+        return 'In Basic Information: save '.implode(', ', $parts).'.';
+    }
+
+    protected function hasBasicInfo(): bool
+    {
+        return (bool) $this->user_id
+            && (bool) $this->profession_id
+            && (bool) $this->experience_id
+            && (bool) $this->education_id
+            && filled($this->gender)
+            && filled($this->marital_status)
+            && filled($this->birth_date)
+            && filled($this->status);
+    }
+
+    /**
+     * Country name for the basic-info location cascade (raw column, then search_country_id, then country_id).
+     */
+    public function basicLocationCountry(): ?string
+    {
+        if (filled($this->getRawOriginal('country'))) {
+            return $this->getRawOriginal('country');
+        }
+
+        if ($this->search_country_id) {
+            return SearchCountry::find($this->search_country_id)?->name;
+        }
+
+        return $this->expected_country?->name;
+    }
+
+    protected function hasLocation(): bool
+    {
+        $hasCountry = filled($this->getRawOriginal('country'))
+            || filled($this->search_country_id)
+            || filled($this->country_id);
+
+        return $hasCountry
+            && filled($this->region)
+            && filled($this->district);
+    }
+
+    protected function hasCvOnFile(): bool
+    {
+        return filled($this->getRawOriginal('cv'))
+            || filled($this->resume_format)
+            || $this->resumes()->exists();
+    }
+
+    protected function hasContactInfo(): bool
+    {
+        if (! $this->user_id) {
+            return false;
+        }
+
+        $contact = ContactInfo::where('user_id', $this->user_id)->first();
+
+        return $contact
+            && filled($contact->phone)
+            && filled($contact->email);
+    }
+
+    protected function hasJobPreferences(): bool
+    {
+        $jr = JobRequirement::where('candidate_id', $this->id)->first();
+
+        if (! $jr) {
+            return false;
+        }
+
+        return filled($jr->region)
+            && ($jr->salary !== null && $jr->salary !== '')
+            && count(cw_json_array($jr->jobs)) > 0
+            && count(cw_json_array($jr->industries)) > 0;
     }
 
     /*
@@ -245,5 +517,10 @@ class Candidate extends Model
     public function getCVPath()
     {
         return $this->hasOne(CandidateResume::class);
+    }
+
+    public function documentRecord(): HasMany
+    {
+        return $this->hasMany(CandidateDocument::class, 'candidate_id');
     }
 }

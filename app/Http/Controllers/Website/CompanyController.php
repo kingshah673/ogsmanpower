@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Website;
 
 use App\Http\Controllers\Controller;
+use App\Services\AI\ParsedJobBatchStoreService;
 use App\Http\Requests\JobCreateRequest;
 use App\Http\Traits\HasCompanyApplication;
 use App\Http\Traits\JobAble;
@@ -59,6 +60,7 @@ use Stichoza\GoogleTranslate\GoogleTranslate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\ForwardCandidateMail;
+use App\Models\Agency;
 
 
 
@@ -83,87 +85,156 @@ class CompanyController extends Controller
     public function downloadApplicantResume($candidate_id, $job_id)
     {
         try {
-            // dd('asdfg');
-            $candidate = Candidate::with(['user', 'socialInfo', 'attributes' => function ($query) {
-                $query->whereNotNull('attribute_value') // Select attributes with non-null values
-                    ->where('is_active', 1); // Select only active attributes
-            }])
-                ->where('id', $candidate_id)
-                ->first();
-            $appliedJob = AppliedJob::where('candidate_id', $candidate_id)->where('job_id', $job_id)->first();
-            // dd($appliedJob->resume_format);
-            $contactInfo = ContactInfo::where('user_id', $candidate->user_id)->first();
-            $contact = $contactInfo ? $contactInfo : '';
+            $appliedJob = $this->findOwnedApplication((int) $candidate_id, (int) $job_id);
 
-            $socials = $candidate->user->socialInfo;
-            $resumes = $candidate->resumes;
-            $job_roles = JobRole::all()->sortBy('name');
-            $experiences = Experience::all();
-            $educations = Education::all();
-            $attachments = Attachment::where('candidate_id', $candidate->id)->first();
-            $professions = Profession::all()->sortBy('name');
-            $skills = Skill::all()->sortBy('name');
-            $languages = CandidateLanguage::all(['id', 'name']);
-            $candidate->load('skills', 'languages', 'experiences', 'educations', 'jobRoleAlerts:id,candidate_id,job_role_id');
-            $translate = new GoogleTranslate($candidate->language_code);
-            $candidate->load('skills', 'languages', 'experiences', 'educations', 'expected_country', 'jobRoleAlerts:id,candidate_id,job_role_id');
-            $viewMap = [
-                'general_format' => 'frontend.pages.candidate.general-resume',
-                'driver_format' => 'frontend.pages.candidate.driver-resume',
-                'guard_format' => 'frontend.pages.candidate.security-guard-resume',
-                'beautician_format' => 'frontend.pages.candidate.beautician-resume',
-                'web_developer_format' => 'frontend.pages.candidate.web-developer-resume',
-                'bike_rider_format' => 'frontend.pages.candidate.bike-rider-resume',
-                'bilangual_format' => 'frontend.pages.candidate.bilangual-resume',
-            ];
-
-            $view = $viewMap[$appliedJob->resume_format] ?? $viewMap['general_format'];
-            // $qrCode = base64_encode(QrCode::format('png')->size(80)->generate('https://example.com/candidate/'.$candidate->id));
-            $qrCode = QrCode::size(70)->generate('https://dev.ogstravel.com/candidate/' . $candidate->id);
-
-            $data = [
-                'candidate' => $candidate,
-                'contact' => $contact,
-                'socials' => $socials,
-                'job_roles' => $job_roles,
-                'experiences' => $experiences,
-                'educations' => $educations,
-                'professions' => $professions,
-                'resumes' => $resumes,
-                'skills' => $skills,
-                'candidate_languages' => $languages,
-                'attachments' => $attachments,
-                'qrCode' => $qrCode,
-                'translate' => $translate
-            ];
-
-            if ($appliedJob->resume_format == 'bilangual_format') {
-                $htmlContent = view($view, $data)->render();
-                $mpdf = new Mpdf();
-                $mpdf->WriteHTML($htmlContent);
-                return $mpdf->Output('candidate_cv_' . $candidate->id . '.pdf', 'D');
-            } else {
-
-                // Generate PDF for download
-                $pdf = PDF::loadView($view, $data);
-                return $pdf->download('candidate_cv_' . $candidate->id . '.pdf');
+            if ($appliedJob->candidate_resume_id) {
+                $resume = $appliedJob->resume ?: \App\Models\CandidateResume::find($appliedJob->candidate_resume_id);
+                if ($resume) {
+                    return redirect()->route('website.candidate.download.cv', $resume);
+                }
             }
+
+            // No uploaded file — send employer to format/language picker (like candidate-cv).
+            return redirect()->route('company.applicant.cv', [
+                'candidate_id' => $candidate_id,
+                'job_id' => $job_id,
+            ]);
         } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
+            flashError('An error occurred: '.$e->getMessage());
+
             return back();
         }
     }
+
+    /**
+     * Employer CV format picker for an applicant (mirrors candidate /candidate-cv).
+     */
+    public function applicantCv($candidate_id, $job_id)
+    {
+        try {
+            $appliedJob = $this->findOwnedApplication((int) $candidate_id, (int) $job_id);
+            $appliedJob->loadMissing('job:id,title,slug');
+            $candidate = Candidate::with(['user', 'skills', 'languages'])->findOrFail($candidate_id);
+
+            return view('frontend.pages.company.applicant-cv', [
+                'candidate' => $candidate,
+                'appliedJob' => $appliedJob,
+                'resumeLanguages' => bilingualResumeLanguages(),
+                'uploadedResume' => $appliedJob->resume,
+            ]);
+        } catch (\Exception $e) {
+            flashError('An error occurred: '.$e->getMessage());
+
+            return back();
+        }
+    }
+
+    /**
+     * View/download generated profile CV for an applicant (same engine as candidate viewResume).
+     */
+    public function viewApplicantResume(Request $request, \App\Services\CandidateResumeViewService $resumeViewService)
+    {
+        try {
+            $data = $request->validate([
+                'candidate_id' => 'required|integer|exists:candidates,id',
+                'job_id' => 'required|integer|exists:jobs,id',
+                'format' => 'required|string',
+                'language_code' => 'nullable|string|max:20',
+                'language_code_custom' => 'nullable|string|max:10',
+                'action_type' => 'nullable|in:view,download',
+            ]);
+
+            $this->findOwnedApplication((int) $data['candidate_id'], (int) $data['job_id']);
+
+            $languageCode = normalizeBilingualLanguageCode(
+                $request->input('language_code'),
+                $request->input('language_code_custom')
+            );
+            $request->merge(['language_code' => $languageCode]);
+
+            $candidate = Candidate::findOrFail($data['candidate_id']);
+            $resumeViewService->loadCandidateForResume($candidate);
+            $view = $resumeViewService->resolveView($data['format']);
+            $viewData = $resumeViewService->buildViewData($candidate, $request);
+            $action = $data['action_type'] ?? 'view';
+
+            if ($data['format'] === 'bilangual_format') {
+                if ($action === 'download') {
+                    @ini_set('memory_limit', '512M');
+                    $htmlContent = view($view, $viewData)->render();
+
+                    return mpdf_download_bilingual_cv(
+                        $htmlContent,
+                        'candidate_cv_'.$candidate->id.'.pdf',
+                        $languageCode
+                    );
+                }
+
+                return view($view, $viewData);
+            }
+
+            if ($action === 'download') {
+                return download_resume_pdf($view, $viewData, 'candidate_cv_'.$candidate->id.'.pdf');
+            }
+
+            return view($view, $viewData);
+        } catch (\Throwable $e) {
+            \Log::error('viewApplicantResume failed', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            // Fatal OOM often surfaces as a blank 500; soft-fail back with a message when possible.
+            if (str_contains($e->getMessage(), 'Allowed memory size') || str_contains($e->getMessage(), 'pcre.backtrack_limit')) {
+                flashError('CV PDF is too large to generate in one pass. Use View Resume, or try a non-bilingual format / Download uploaded resume.');
+
+                return redirect()->route('company.applicant.cv', [
+                    'candidate_id' => $request->input('candidate_id'),
+                    'job_id' => $request->input('job_id'),
+                ]);
+            }
+
+            flashError('Could not generate CV: '.$e->getMessage());
+
+            return back();
+        }
+    }
+
+    /**
+     * Ensure the logged-in company owns this application.
+     */
+    protected function findOwnedApplication(int $candidateId, int $jobId): AppliedJob
+    {
+        $companyId = (int) currentCompany()->id;
+
+        $appliedJob = AppliedJob::query()
+            ->with('resume')
+            ->where('candidate_id', $candidateId)
+            ->where('job_id', $jobId)
+            ->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)
+                    ->orWhereHas('job', fn ($jq) => $jq->where('company_id', $companyId));
+            })
+            ->firstOrFail();
+
+        return $appliedJob;
+    }
+
     public function applicationDetail($candidate_id, $job_id)
     {
 
         try {
 
 
-            $candidate = Candidate::with('skills', 'languages:id,name', 'profession')->findOrFail($candidate_id);
+            $candidate = Candidate::with([
+                'skills', 'languages:id,name', 'profession', 'experience', 'education',
+                'experiences', 'educations',
+            ])->findOrFail($candidate_id);
             $user = User::with('socialInfo', 'contactInfo')->findOrFail($candidate->user_id);
             $appliedJobs = $candidate->appliedJobs()->with('company.user', 'category', 'role')->get();
             $bookmarkJobs = $candidate->bookmarkJobs()->with('company.user', 'category', 'role')->get();
-            $candiateJob = AppliedJob::where('candidate_id', $candidate_id)->where('job_id', $job_id)->first();
+            $candiateJob = AppliedJob::with('job')->where('candidate_id', $candidate_id)->where('job_id', $job_id)->first();
             return view('frontend.pages.company.application-detail', compact('candidate', 'user', 'appliedJobs', 'bookmarkJobs', 'candiateJob'));
         } catch (\Exception $e) {
             flashError('An error occurred: ' . $e->getMessage());
@@ -176,14 +247,115 @@ class CompanyController extends Controller
     {
         $validated = $request->validate([
             'id' => 'required|exists:applied_jobs,id',
-            'status' => 'required|in:selected,rejected,shortlisted,pending',
+            'status' => 'required|in:selected,rejected,shortlisted,pending,interview',
+            'interview_date' => 'nullable|date',
+            'interview_location' => 'nullable|string|max:255',
         ]);
 
-        $application = AppliedJob::find($validated['id']);
-        $application->status = $validated['status'];
-        $application->save();
+        $application = AppliedJob::with('job:id,company_id')->findOrFail($validated['id']);
+        $companyId = (int) currentCompany()->id;
+        $owns = (int) $application->company_id === $companyId
+            || (int) optional($application->job)->company_id === $companyId;
+        abort_if(! $owns, 403);
 
-        return response()->json(['success' => true, 'message' => 'Status updated successfully.']);
+        $extra = [];
+        if (($validated['status'] ?? '') === 'interview') {
+            $extra['interview_date'] = $validated['interview_date'] ?? null;
+            $extra['interview_location'] = $validated['interview_location'] ?? null;
+            $extra['interview_outcome'] = 'scheduled';
+        }
+
+        app(\App\Services\Jobs\ApplicationStatusService::class)
+            ->updateStatus($application, $validated['status'], $extra);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Status updated successfully.']);
+        }
+
+        $label = $validated['status'] === 'interview' ? 'invited for interview' : $validated['status'];
+        flashSuccess('Application marked as '.$label.'.');
+
+        return back();
+    }
+
+    /**
+     * Interview pipeline — applicants with status=interview.
+     */
+    public function interviews(Request $request)
+    {
+        $companyId = (int) currentCompany()->id;
+
+        $query = AppliedJob::query()
+            ->with([
+                'job:id,title,slug,company_id',
+                'candidate' => function ($q) {
+                    $q->with(['user:id,name,username,image', 'profession']);
+                },
+            ])
+            ->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)
+                    ->orWhereHas('job', fn ($jq) => $jq->where('company_id', $companyId));
+            })
+            ->where('status', 'interview')
+            ->whereNotNull('candidate_id')
+            ->latest('id');
+
+        if ($request->filled('outcome') && $request->outcome !== 'all') {
+            $query->where('interview_outcome', $request->outcome);
+        }
+
+        if ($request->filled('q')) {
+            $term = $request->q;
+            $query->whereHas('candidate.user', fn ($q) => $q->where('name', 'like', '%'.$term.'%'));
+        }
+
+        $interviews = $query->paginate(12)->withQueryString();
+
+        $base = AppliedJob::query()
+            ->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)
+                    ->orWhereHas('job', fn ($jq) => $jq->where('company_id', $companyId));
+            })
+            ->where('status', 'interview')
+            ->whereNotNull('candidate_id');
+
+        $counts = [
+            'all' => (clone $base)->count(),
+            'scheduled' => (clone $base)->where('interview_outcome', 'scheduled')->count(),
+            'rescheduled' => (clone $base)->where('interview_outcome', 'rescheduled')->count(),
+            'completed' => (clone $base)->where('interview_outcome', 'completed')->count(),
+        ];
+
+        return view('frontend.pages.company.interviews', compact('interviews', 'counts'));
+    }
+
+    public function updateInterview(Request $request)
+    {
+        $validated = $request->validate([
+            'id' => 'required|exists:applied_jobs,id',
+            'action' => 'required|in:invite,accept,reject,reschedule,complete,completed',
+            'interview_date' => 'nullable|date',
+            'interview_location' => 'nullable|string|max:255',
+        ]);
+
+        $application = AppliedJob::with('job:id,company_id')->findOrFail($validated['id']);
+        $companyId = (int) currentCompany()->id;
+        $owns = (int) $application->company_id === $companyId
+            || (int) optional($application->job)->company_id === $companyId;
+        abort_if(! $owns, 403);
+
+        app(\App\Services\Jobs\ApplicationStatusService::class)->updateInterview(
+            $application,
+            $validated['action'],
+            [
+                'interview_date' => $validated['interview_date'] ?? null,
+                'interview_location' => $validated['interview_location'] ?? null,
+            ]
+        );
+
+        flashSuccess('Interview updated ('.$validated['action'].'). Candidate has been notified by email.');
+
+        return back();
     }
 
     public function candidate_status()
@@ -347,29 +519,39 @@ class CompanyController extends Controller
     public function myjobs(Request $request)
     {
         try {
+            storePlanInformation();
+            activateEligiblePendingJobs(currentCompany());
+
             $query = currentCompany()
                 ->jobs()
                 ->withCount('appliedJobs')
                 ->withoutEdited();
 
             // status search
-            if ($request->has('status') && $request->status != null) {
+            if ($request->filled('status')) {
                 $query->where('status', $request->status);
             }
 
-            // status search
-            if ($request->has('apply_on') && $request->apply_on != null) {
+            if ($request->filled('apply_on')) {
                 $query->where('apply_on', $request->apply_on);
             }
 
+            $stats = [
+                'total' => (clone $query)->count(),
+                'active' => (clone $query)->where('status', 'active')->count(),
+                'applications' => \App\Models\AppliedJob::query()
+                    ->whereIn('job_id', (clone $query)->select('id'))
+                    ->count(),
+            ];
+
             $myJobs = $query
-                ->with('job_type:id')
+                ->with('job_type:id', 'agencies')
                 ->latest()
                 ->paginate(12)
                 ->withQueryString();
 
             foreach ($myJobs as $job) {
-                if ($job->days_remaining < 1) {
+                if ($job->deadline && ! $job->deadline_active) {
                     $job->update([
                         'status' => 'expired',
                         'deadline' => null,
@@ -377,7 +559,7 @@ class CompanyController extends Controller
                 }
             }
 
-            return view('frontend.pages.company.myjobs', compact('myJobs'));
+            return view('frontend.pages.company.myjobs', compact('myJobs', 'stats'));
         } catch (\Exception $e) {
             flashError('An error occurred: ' . $e->getMessage());
 
@@ -408,7 +590,7 @@ class CompanyController extends Controller
                 ->withQueryString();
 
             foreach ($myJobs as $job) {
-                if ($job->days_remaining < 1) {
+                if ($job->deadline && ! $job->deadline_active) {
                     $job->update([
                         'status' => 'expired',
                         'deadline' => null,
@@ -423,6 +605,68 @@ class CompanyController extends Controller
             return back();
         }
     }
+    public function assignAgency($jobId)
+{
+    $job = Job::with('agencies')->findOrFail($jobId);
+
+    $agencies = Agency::with(['user'])
+    ->whereHas('user', function ($query) {
+
+        $query->where('role', 'agency')
+              ->where('status', 1);
+
+    })
+    ->latest()
+    ->get();
+
+    $userPlan = auth()->user()->company->userPlan;
+
+    $agencyLimit = $userPlan->plan->agency_limit ?? 1;
+
+    return view(
+        'frontend.pages.company.assign-agency',
+        compact('job', 'agencies', 'agencyLimit')
+    );
+}
+public function storeAssignAgency(Request $request, $jobId)
+{
+    $request->validate([
+        'agency_ids' => 'required|array',
+        'agency_ids.*' => 'exists:agencies,id',
+    ]);
+
+    $job = Job::findOrFail($jobId);
+
+    $userPlan = auth()->user()->company->userPlan;
+
+    $agencyLimit = $userPlan->plan->agency_limit ?? 1;
+
+    if (count($request->agency_ids) > $agencyLimit) {
+
+        flashError("Your current plan allows only {$agencyLimit} agencies");
+
+        return back();
+    }
+
+    $previouslyAssigned = $job->agencies()->pluck('agencies.id')->all();
+
+    $job->agencies()->sync($request->agency_ids);
+
+    $newlyAssignedIds = array_diff($request->agency_ids, $previouslyAssigned);
+
+    if ($newlyAssignedIds !== []) {
+        $newAgencies = Agency::with('user')->whereIn('id', $newlyAssignedIds)->get();
+        foreach ($newAgencies as $newAgency) {
+            if ($newAgency->user) {
+                Notification::send($newAgency->user, new \App\Notifications\Website\Agency\JobAssignedNotification($job));
+            }
+        }
+    }
+
+    flashSuccess('Agencies assigned successfully');
+
+    return redirect()->route('company.myjob');
+}
 
     /**
      * Company all notifications
@@ -444,6 +688,215 @@ class CompanyController extends Controller
             return back();
         }
     }
+    
+    
+    public function shortlistCandidate(Request $request)
+{
+    $pipeline = \DB::table('job_candidate_pipeline')
+
+        ->where('candidate_id', $request->candidate_id)
+
+        ->where('job_id', $request->job_id)
+
+        ->first();
+
+    if(!$pipeline){
+
+        \DB::table('job_candidate_pipeline')
+
+            ->insert([
+
+                'candidate_id' => $request->candidate_id,
+
+                'job_id' => $request->job_id,
+
+                'company_id' => auth()->user()->company->id,
+
+                'status' => 'shortlisted',
+
+                'hiring_status' => 'not_started',
+
+                'created_at' => now(),
+
+                'updated_at' => now(),
+
+            ]);
+
+    }else{
+
+        \DB::table('job_candidate_pipeline')
+
+            ->where('id', $pipeline->id)
+
+            ->update([
+
+                'status' => 'shortlisted',
+
+                'updated_at' => now()
+
+            ]);
+
+    }
+
+    return back()->with(
+        'success',
+        'Candidate shortlisted successfully'
+    );
+}
+
+public function interviewCandidate(Request $request)
+{
+    \DB::table('job_candidate_pipeline')
+
+        ->updateOrInsert(
+
+            [
+                'candidate_id' => $request->candidate_id,
+                'job_id' => $request->job_id,
+            ],
+
+            [
+                'company_id' => auth()->user()->company->id,
+
+                'status' => 'interview',
+
+                'updated_at' => now(),
+
+                'created_at' => now(),
+            ]
+
+        );
+
+    return back()->with(
+        'success',
+        'Candidate moved to interview'
+    );
+}
+
+public function rejectCandidate(Request $request)
+{
+    \DB::table('job_candidate_pipeline')
+
+        ->updateOrInsert(
+
+            [
+                'candidate_id' => $request->candidate_id,
+                'job_id' => $request->job_id,
+            ],
+
+            [
+                'company_id' => auth()->user()->company->id,
+
+                'status' => 'rejected',
+
+                'updated_at' => now(),
+
+                'created_at' => now(),
+            ]
+
+        );
+
+    return back()->with(
+        'success',
+        'Candidate rejected successfully'
+    );
+}
+
+public function updatePipelineStatus(Request $request, $id)
+{
+    $request->validate([
+        'status' => 'required|string',
+    ]);
+
+    $companyId = auth()->user()->company->id;
+
+    $updated = \DB::table('job_candidate_pipeline')
+        ->where('id', $id)
+        ->where('company_id', $companyId)
+        ->update([
+            'status' => $request->status,
+            'updated_at' => now(),
+        ]);
+
+    if (! $updated) {
+        flashError(__('Candidate not found in your pipeline.'));
+
+        return back();
+    }
+
+    flashSuccess(__('Candidate status updated successfully'));
+
+    return back();
+}
+
+public function storeContract(Request $request)
+{
+    $pipeline = \DB::table('job_candidate_pipeline')
+
+        ->where('candidate_id', $request->candidate_id)
+
+        ->where('job_id', $request->job_id)
+
+        ->first();
+
+    if(!$pipeline){
+
+        return back()->with(
+            'error',
+            'Please shortlist candidate first'
+        );
+
+    }
+
+    \DB::table('candidate_contracts')
+
+        ->insert([
+
+            'pipeline_id' => $pipeline->id,
+
+            'candidate_id' => $request->candidate_id,
+
+            'job_id' => $request->job_id,
+
+            'company_id' => auth()->user()->company->id,
+
+            'contract_title' => $request->contract_title,
+
+            'contract_details' => $request->contract_details,
+
+            'salary' => $request->salary,
+
+            'duty_hours' => $request->duty_hours,
+
+            'contract_duration' => $request->contract_duration,
+
+            'location' => $request->location,
+
+            'status' => 'sent',
+
+            'created_at' => now(),
+
+            'updated_at' => now(),
+
+        ]);
+
+    \DB::table('job_candidate_pipeline')
+
+        ->where('id', $pipeline->id)
+
+        ->update([
+
+            'hiring_status' => 'contract_sent',
+
+            'updated_at' => now()
+
+        ]);
+
+    return back()->with(
+        'success',
+        'Contract created successfully'
+    );
+}
 
     /**
      * Company payperjob
@@ -519,6 +972,62 @@ class CompanyController extends Controller
             return back();
         }
     }
+ //   public function storeContract(Request $request)
+//{
+  //  $request->validate([
+//        'pipeline_id' => 'required',
+ //       'candidate_id' => 'required',
+ //       'job_id' => 'required',
+  //      'contract_title' => 'required',
+//    ]);
+
+  //  \DB::table('candidate_contracts')->insert([
+//
+  //      'pipeline_id' => $request->pipeline_id,
+
+    //    'candidate_id' => $request->candidate_id,
+
+      //  'job_id' => $request->job_id,
+
+        //'company_id' => auth()->user()->company->id,
+
+//        'contract_title' => $request->contract_title,
+
+  //      'contract_details' => $request->contract_details,
+
+//        'salary' => $request->salary,
+
+//        'duty_hours' => $request->duty_hours,
+
+//        'contract_duration' => $request->contract_duration,
+
+//        'location' => $request->location,
+
+//        'status' => 'sent',
+
+//        'created_at' => now(),
+//
+//        'updated_at' => now(),
+
+//    ]);
+
+//    \DB::table('job_candidate_pipeline')
+
+//        ->where('id', $request->pipeline_id)
+
+//        ->update([
+
+//            'hiring_status' => 'contract_sent',
+
+//            'updated_at' => now()
+
+  //      ]);
+
+//    return back()->with(
+//        'success',
+//        'Contract sent successfully'
+//    );
+//}
 
     /**
      * Company payperjob payment
@@ -603,6 +1112,14 @@ class CompanyController extends Controller
     }
 
     /**
+     * AJAX lookup for employer job form Select2 fields (same pattern as seeker settings).
+     */
+    public function jobFormLookup(string $type, Request $request)
+    {
+        return app(\App\Services\AttributeLookupService::class)->search($type, $request);
+    }
+
+    /**
      * Company create job page
      *
      * @return Response
@@ -614,7 +1131,7 @@ class CompanyController extends Controller
             storePlanInformation();
             $userPlan = session('user_plan');
 
-            if ((int) $userPlan->job_limit < 1) {
+            if (! $userPlan || (int) ($userPlan->job_limit ?? 0) < 1) {
                 session()->flash('error', __('you_have_reached_your_plan_limit_please_upgrade_your_plan'));
 
                 return redirect()->route('company.plan');
@@ -637,7 +1154,13 @@ class CompanyController extends Controller
             $company_benefits = $all_benefits->where('company_id', currentCompany()->id);
             $data['benefits'] = $non_company_benefits->merge($company_benefits);
             $data['skills'] = Skill::all()->sortBy('name');
-            $data['dynamicInputs'] = CompanyAttribute::all();
+            $data['dynamicInputs'] = CompanyAttribute::query()
+                ->where(function ($q) {
+                    $q->where('section', 'job_post')->orWhereNull('section');
+                })
+                ->where('is_active', 1)
+                ->orderBy('sort_order')
+                ->get();
             $data['jobtitles']    = Profession::all();
 
 
@@ -657,15 +1180,76 @@ class CompanyController extends Controller
     public function storeJob(JobCreateRequest $request)
     {
         try {
+            storePlanInformation();
+            $userPlan = session('user_plan');
+
+            if ((int) ($userPlan->job_limit ?? 0) < 1) {
+                flashError(__('you_have_reached_your_plan_limit_please_upgrade_your_plan'));
+
+                return redirect()->route('company.plan');
+            }
+
             $jobCreated = (new CompanyStoreService)->execute($request);
 
-            flashSuccess(__('job_created_successfully'));
+            if ($jobCreated->status === 'pending') {
+                flashWarning(__('Your job was saved and is awaiting admin approval before it appears publicly.'));
+            } else {
+                flashSuccess(__('job_created_successfully'));
+            }
 
             return redirect()->route('company.job.promote.show', $jobCreated->slug);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             flashError('An error occurred: ' . $e->getMessage());
 
-            return back();
+            return back()->withInput();
+        }
+    }
+
+    /**
+     * Store multiple jobs parsed from one advertisement (AI batch).
+     */
+    public function storeParsedJobs(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'jobs' => 'required|array|min:1|max:50',
+            'jobs.*.job_title' => 'required|string|max:255',
+            'shared' => 'nullable|array',
+        ]);
+
+        try {
+            storePlanInformation();
+            $userPlan = session('user_plan');
+
+            if ((int) ($userPlan->job_limit ?? 0) < 1) {
+                return response()->json([
+                    'error' => 'plan_limit',
+                    'message' => __('you_have_reached_your_plan_limit_please_upgrade_your_plan'),
+                ], 422);
+            }
+
+            $result = (new ParsedJobBatchStoreService(new \App\Services\Website\Company\CompanyStoreService))
+                ->execute($request->input('jobs', []), $request->input('shared', []));
+
+            $createdCount = count($result['created']);
+            if ($createdCount === 0) {
+                return response()->json([
+                    'error' => 'none_created',
+                    'message' => __('No jobs could be posted. Please review your plan limit or try again.'),
+                    'result' => $result,
+                ], 422);
+            }
+
+            return response()->json([
+                'message' => __(':count job(s) posted successfully.', ['count' => $createdCount]),
+                'result' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'server_error',
+                'message' => $e->getMessage(),
+            ], 500);
         }
     }
 
@@ -698,7 +1282,13 @@ class CompanyController extends Controller
                 ->company->questions()
                 ->where('reuse', true)
                 ->get();
-            $data['dynamicInputs'] = CompanyAttribute::all();
+            $data['dynamicInputs'] = CompanyAttribute::query()
+                ->where(function ($q) {
+                    $q->where('section', 'job_post')->orWhereNull('section');
+                })
+                ->where('is_active', 1)
+                ->orderBy('sort_order')
+                ->get();
             $data['inputsData'] = CompanyAttributeTranslation::where('company_id', currentCompany()->id)->where('job_id', $job->id)->get();
             $data['jobtitles']    = Profession::all();
 
@@ -870,6 +1460,142 @@ class CompanyController extends Controller
             return back();
         }
     }
+    
+    public function pipeline()
+{
+    $company = auth()->user()->company;
+
+    $candidates = \DB::table('job_candidate_pipeline')
+
+        /*
+        |--------------------------------------------------------------------------
+        | PIPELINE
+        |--------------------------------------------------------------------------
+        */
+
+        ->leftJoin(
+            'candidates',
+            'candidates.id',
+            '=',
+            'job_candidate_pipeline.candidate_id'
+        )
+
+        ->leftJoin(
+            'users as candidate_user',
+            'candidate_user.id',
+            '=',
+            'candidates.user_id'
+        )
+
+        /*
+        |--------------------------------------------------------------------------
+        | JOB
+        |--------------------------------------------------------------------------
+        */
+
+        ->leftJoin(
+            'jobs',
+            'jobs.id',
+            '=',
+            'job_candidate_pipeline.job_id'
+        )
+
+        /*
+        |--------------------------------------------------------------------------
+        | AGENCY
+        |--------------------------------------------------------------------------
+        */
+
+        ->leftJoin(
+            'agencies',
+            'agencies.id',
+            '=',
+            'job_candidate_pipeline.agency_id'
+        )
+
+        ->leftJoin(
+            'users as agency_user',
+            'agency_user.id',
+            '=',
+            'agencies.user_id'
+        )
+
+        /*
+        |--------------------------------------------------------------------------
+        | CONTRACT
+        |--------------------------------------------------------------------------
+        */
+
+        ->leftJoin(
+            'candidate_contracts',
+            'candidate_contracts.pipeline_id',
+            '=',
+            'job_candidate_pipeline.id'
+        )
+
+        ->select(
+
+            'job_candidate_pipeline.*',
+
+            /*
+            |--------------------------------------------------------------------------
+            | CANDIDATE
+            |--------------------------------------------------------------------------
+            */
+
+            'candidates.first_name',
+
+            'candidates.last_name',
+
+            'candidate_user.email',
+
+            /*
+            |--------------------------------------------------------------------------
+            | JOB
+            |--------------------------------------------------------------------------
+            */
+
+            'jobs.title as job_title',
+
+            /*
+            |--------------------------------------------------------------------------
+            | AGENCY
+            |--------------------------------------------------------------------------
+            */
+
+            'agency_user.name as agency_name',
+
+            /*
+            |--------------------------------------------------------------------------
+            | CONTRACT
+            |--------------------------------------------------------------------------
+            */
+
+            'candidate_contracts.id as contract_id',
+
+            'candidate_contracts.contract_title',
+
+            'candidate_contracts.status as contract_status'
+
+        )
+
+        /*
+        |--------------------------------------------------------------------------
+        | COMPANY JOBS ONLY
+        |--------------------------------------------------------------------------
+        */
+
+        ->where('jobs.company_id', $company->id)
+
+        ->latest('job_candidate_pipeline.id')
+
+        ->get();
+
+    return view(
+        'frontend.pages.company.pipeline',
+        compact('candidates')
+    );
+}
 
     /**
      * Company setting page
@@ -881,12 +1607,23 @@ class CompanyController extends Controller
     public function setting()
     {
         try {
-            $data['user'] = User::with('company', 'contactInfo', 'socialInfo')->findOrFail(auth('user')->id());
+            $user = authUser();
+
+            if (! $user) {
+                return redirect()->route('login');
+            }
+
+            $user->load(['company', 'contactInfo', 'socialInfo']);
+            $data['user'] = $user;
             $data['socials'] = $data['user']->socialInfo;
             $data['contact'] = $data['user']->contactInfo;
             $data['organization_types'] = OrganizationType::all()->sortBy('name');
             $data['industry_types'] = IndustryType::all()->sortBy('name');
             $data['team_sizes'] = TeamSize::all();
+            $company = $data['user']->company;
+            $data['dynamicFieldsBySection'] = $company
+                ? \App\Services\DynamicFieldService::employerFieldsGroupedBySection($company)
+                : [];
 
             return view('frontend.pages.company.setting', $data);
         } catch (\Exception $e) {
@@ -909,6 +1646,8 @@ class CompanyController extends Controller
             flashSuccess(__('profile_updated'));
 
             return back();
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             flashError('An error occurred: ' . $e->getMessage());
 
@@ -999,7 +1738,33 @@ class CompanyController extends Controller
     public function accountProgress()
     {
         try {
-            $data['user'] = User::with('company', 'contactInfo', 'socialInfo')->findOrFail(auth()->user()->id);
+            $company = currentCompany();
+
+            if ($company && $company->profile_completion) {
+                return redirect()->route('company.dashboard');
+            }
+
+            if (request()->has('profile')) {
+                return redirect()->route('company.account-progress')->withFragment('section-profile');
+            }
+            if (request()->has('social')) {
+                return redirect()->route('company.account-progress')->withFragment('section-social');
+            }
+            if (request()->has('contact')) {
+                return redirect()->route('company.account-progress')->withFragment('section-contact');
+            }
+            if (request()->has('complete')) {
+                return redirect()->route('company.account-progress');
+            }
+
+            $user = authUser();
+
+            if (! $user) {
+                return redirect()->route('login');
+            }
+
+            $user->load(['company', 'contactInfo', 'socialInfo']);
+            $data['user'] = $user;
             $data['countries'] = Country::all();
             $data['industry_types'] = IndustryType::all()->sortBy('name');
             $data['organization_types'] = OrganizationType::all()->sortBy('name');
@@ -1009,10 +1774,6 @@ class CompanyController extends Controller
             $data['title'] = $title;
             $data['subtitle'] = $subtitle;
             $data['socials'] = $data['user']->socialInfo;
-
-            if (request()->has('complete')) {
-                return view('frontend.pages.company.account-progress.complete', compact('title', 'subtitle'));
-            }
 
             return view('frontend.pages.company.account-progress', $data);
         } catch (\Exception $e) {
@@ -1047,6 +1808,7 @@ class CompanyController extends Controller
     public function makeJobExpire(Job $job)
     {
         try {
+            abort_if((int) $job->company_id !== (int) currentCompany()->id, 403);
             $job->update(['status' => 'expired']);
 
             flashSuccess(__('job_status_now_expire'));
@@ -1060,6 +1822,56 @@ class CompanyController extends Controller
     }
 
     /**
+     * Delete a single company-owned job.
+     */
+    public function destroyJob(Job $job)
+    {
+        try {
+            abort_if((int) $job->company_id !== (int) currentCompany()->id, 403);
+
+            $job->delete();
+            flashSuccess(__('job_deleted_successfully'));
+
+            return back();
+        } catch (\Exception $e) {
+            flashError('An error occurred: '.$e->getMessage());
+
+            return back();
+        }
+    }
+
+    /**
+     * Bulk-delete company-owned jobs.
+     */
+    public function destroyJobs(Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'ids' => 'required|array|min:1',
+                'ids.*' => 'integer',
+            ]);
+
+            $companyId = (int) currentCompany()->id;
+            $deleted = Job::query()
+                ->where('company_id', $companyId)
+                ->whereIn('id', $data['ids'])
+                ->get();
+
+            foreach ($deleted as $job) {
+                $job->delete();
+            }
+
+            flashSuccess(__('job_deleted_successfully').' ('.$deleted->count().')');
+
+            return back();
+        } catch (\Exception $e) {
+            flashError('An error occurred: '.$e->getMessage());
+
+            return back();
+        }
+    }
+
+    /**
      * Make Job Active
      *
      * @return \Illuminate\Http\Response
@@ -1067,6 +1879,7 @@ class CompanyController extends Controller
     public function makeJobActive(Job $job)
     {
         try {
+            abort_if((int) $job->company_id !== (int) currentCompany()->id, 403);
 
             if ($job->deadline < now()) {
 

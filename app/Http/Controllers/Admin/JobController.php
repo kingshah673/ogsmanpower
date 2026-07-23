@@ -10,15 +10,19 @@ use App\Models\AppliedJob;
 use App\Models\Benefit;
 use App\Models\CandidateJobAlert;
 use App\Models\Company;
+use App\Models\Agency;
 use App\Models\Education;
 use App\Models\Experience;
 use App\Models\Job;
 use App\Models\JobCategory;
 use App\Models\CompanyAttribute;
+use App\Models\AgencyAttribute;
 use App\Models\CompanyAttributeTranslation;
+use App\Models\AgencyAttributeTranslation;
 use App\Models\HireRequest;
 use App\Models\JobRole;
 use App\Models\JobTitle;
+use App\Models\Profession;
 use App\Models\JobType;
 use App\Models\SalaryType;
 use App\Models\Skill;
@@ -40,6 +44,7 @@ use App\Models\IndustryType;
 use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class JobController extends Controller
@@ -129,21 +134,37 @@ class JobController extends Controller
             'admin_id' => auth()->user()->id,
             'company_id' => $job->company_id ?? null,
             'cover_letter' => $request->cover_letter,
-            'resume_format' => $request->resume_format,
             'application_group_id' => $job->company->applicationGroups->where('is_deleteable', false)->first()->id ?? 1,
+            'status' => 'pending',
             'created_at' => now(),
             'updated_at' => now(),
         ];
 
+        if ($request->filled('resume_format') && Schema::hasColumn('applied_jobs', 'resume_format')) {
+            $data['resume_format'] = $request->resume_format;
+        }
+
         // Check if a CV is uploaded
         if ($request->hasFile('cv')) {
             $path = $request->file('cv')->store('public/cvs');
-            $data['cv_path'] = $path;
+            if (Schema::hasColumn('applied_jobs', 'cv_path')) {
+                $data['cv_path'] = $path;
+            }
         }
 
         // Check if a candidate is selected
         if ($request->candidate_id) {
-            $data['candidate_id'] = $request->candidate_id ?? null;
+            $data['candidate_id'] = $request->candidate_id;
+
+            if ($request->hasFile('cv')) {
+                $filePath = uploadFileToPublic($request->file('cv'), 'file/candidates/');
+                $resume = \App\Models\CandidateResume::create([
+                    'candidate_id' => $request->candidate_id,
+                    'name' => pathinfo($request->file('cv')->getClientOriginalName(), PATHINFO_FILENAME) ?: 'Admin Apply CV',
+                    'file' => $filePath,
+                ]);
+                $data['candidate_resume_id'] = $resume->id;
+            }
         }
 
         // Insert the record into the database
@@ -153,26 +174,78 @@ class JobController extends Controller
     }
 
     public function assignRoles(Request $request, $jobId)
-    {
-        // dd($request->all());
-        // Validate the incoming roles
-        $request->validate([
-            'roles' => 'nullable|array',
-            // 'roles.*' => 'exists:roles,name', // Validate that role names exist in the roles table
-        ]);
-        // dd($request->roles);
-        // Find the job
-        $job = Job::findOrFail($jobId);
-        // dd($jobs);
+{
+    $request->validate([
+        'roles'   => 'nullable|array',
+        'agents'  => 'nullable|array',
+        'agencies'=> 'nullable|array',
+    ]);
 
-        $roles = implode(',', $request->roles ?? []);
+    $job = Job::findOrFail($jobId);
 
-        $job->job_roles = $roles;
-        $job->save();
+    // ✅ SAVE ROLES
+    $job->job_roles = implode(',', $request->roles ?? []);
 
-        // Redirect with success message
-        return redirect()->route('job.index')->with('success', 'Roles assigned successfully.');
+    // ✅ SAVE AGENTS
+    if ($request->has('agents')) {
+        $job->assigned_agents = in_array('all', $request->agents)
+            ? json_encode(['all'])
+            : json_encode($request->agents);
+    } else {
+        $job->assigned_agents = null;
     }
+
+    // ✅ SAVE AGENCY (FIXED COLUMN NAME)
+    if ($request->has('agencies')) {
+        $job->assigned_agency = in_array('all', $request->agencies)
+            ? json_encode(['all'])
+            : json_encode($request->agencies);
+    } else {
+        $job->assigned_agency = null;
+    }
+
+    $job->save();
+
+    return redirect()->route('job.index')->with('success', 'Job assigned successfully.');
+}
+    
+    public function bulkAssign(Request $request)
+{
+    $jobIds = explode(',', $request->job_ids);
+
+    foreach($jobIds as $jobId){
+
+        $job = \App\Models\Job::find($jobId);
+        if(!$job) continue;
+
+        // ✅ SAVE ROLES
+        $job->assigned_roles = json_encode($request->roles ?? []);
+
+        // =========================
+        // ✅ SAVE AGENTS
+        // =========================
+        if(in_array('all', $request->agents ?? [])){
+            $job->assigned_agents = json_encode(['all']);
+        } else {
+            $job->assigned_agents = json_encode($request->agents ?? []);
+        }
+
+        // =========================
+        // ✅ SAVE AGENCIES (NEW)
+        // =========================
+        if(in_array('all', $request->agencies ?? [])){
+            $job->assigned_agency = json_encode(['all']);
+        } else {
+            $job->assigned_agency = json_encode($request->agencies ?? []);
+        }
+
+        $job->save();
+    }
+
+    return back()->with('success','Jobs assigned successfully');
+}
+
+
     public function index(Request $request)
     {
         try {
@@ -288,7 +361,7 @@ class JobController extends Controller
             $data['tags'] = Tag::all()->sortBy('name');
             $data['skills'] = Skill::all()->sortBy('name');
             $data['dynamicInputs'] = CompanyAttribute::all();
-            $data['jobtitles']    = JobTitle::all();
+            $data['jobtitles']    = Profession::all()->sortBy('name');
             $data['industry_types'] = IndustryType::all()->sortBy('name');
             return view('backend.Job.create', $data);
         } catch (\Exception $e) {
@@ -338,20 +411,71 @@ class JobController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function store(JobFormRequest $request)
-    {
-        try {
-            abort_if(! userCan('job.create'), 403);
-            (new JobCreateService)->execute($request);
+{
+    try {
 
-            flashSuccess(__('job_created_successfully'));
+        abort_if(! userCan('job.create'), 403);
 
-            return redirect()->route('job.index');
-        } catch (\Exception $e) {
-            flashError('An error occurred: ' . $e->getMessage());
+        /*
+        |--------------------------------------------------------------------------
+        | FEATURE LIMIT CHECK
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            !auth()->user()->canUseFeature(
+                'active_job_posting_limit'
+            )
+        ) {
+
+            flashError(
+                'Your job posting limit has been exceeded'
+            );
 
             return back();
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CREATE JOB
+        |--------------------------------------------------------------------------
+        */
+
+        (new JobCreateService)->execute($request);
+
+        /*
+        |--------------------------------------------------------------------------
+        | INCREASE FEATURE USAGE
+        |--------------------------------------------------------------------------
+        */
+
+        auth()->user()->increaseFeatureUsage(
+            'active_job_posting_limit'
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUCCESS
+        |--------------------------------------------------------------------------
+        */
+
+        flashSuccess(
+            __('job_created_successfully')
+        );
+
+        return redirect()
+            ->route('job.index');
+
+    } catch (\Exception $e) {
+
+        flashError(
+            'An error occurred: '
+            . $e->getMessage()
+        );
+
+        return back();
     }
+}
 
     /**
      * Display the specified resource.
@@ -397,7 +521,7 @@ class JobController extends Controller
             $data['skills'] = Skill::all()->sortBy('name');
             $data['dynamicInputs'] = CompanyAttribute::all();
             $data['inputsData'] = CompanyAttributeTranslation::where('job_id', $job->id)->get();
-            $data['jobtitles']    = JobTitle::all();
+            $data['jobtitles']    = Profession::all()->sortBy('name');
             $data['industry_types'] = IndustryType::all()->sortBy('name');
             return view('backend.Job.edit', $data);
         } catch (\Exception $e) {
@@ -429,6 +553,174 @@ class JobController extends Controller
             return back();
         }
     }
+    
+    /*
+|--------------------------------------------------------------------------
+| FEATURED JOB
+|--------------------------------------------------------------------------
+*/
+
+public function makeFeatured(Job $job)
+{
+    try {
+
+        abort_if(! userCan('job.update'), 403);
+
+        /*
+        |--------------------------------------------------------------------------
+        | FEATURE LIMIT CHECK
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            !auth()->user()->canUseFeature(
+                'featured_job_limit'
+            )
+        ) {
+
+            flashError(
+                'Your featured job limit has been exceeded'
+            );
+
+            return back();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ALREADY FEATURED
+        |--------------------------------------------------------------------------
+        */
+
+        if ($job->featured) {
+
+            flashError(
+                'Job is already featured'
+            );
+
+            return back();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE JOB
+        |--------------------------------------------------------------------------
+        */
+
+        $job->update([
+
+            'featured' => 1
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | INCREASE USAGE
+        |--------------------------------------------------------------------------
+        */
+
+        auth()->user()->increaseFeatureUsage(
+            'featured_job_limit'
+        );
+
+        flashSuccess(
+            'Job featured successfully'
+        );
+
+        return back();
+
+    } catch (\Exception $e) {
+
+        flashError(
+            'An error occurred: '
+            . $e->getMessage()
+        );
+
+        return back();
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| HIGHLIGHT JOB
+|--------------------------------------------------------------------------
+*/
+
+public function makeHighlight(Job $job)
+{
+    try {
+
+        abort_if(! userCan('job.update'), 403);
+
+        /*
+        |--------------------------------------------------------------------------
+        | FEATURE LIMIT CHECK
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            !auth()->user()->canUseFeature(
+                'highlight_job_limit'
+            )
+        ) {
+
+            flashError(
+                'Your highlight job limit has been exceeded'
+            );
+
+            return back();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ALREADY HIGHLIGHTED
+        |--------------------------------------------------------------------------
+        */
+
+        if ($job->highlight) {
+
+            flashError(
+                'Job is already highlighted'
+            );
+
+            return back();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE JOB
+        |--------------------------------------------------------------------------
+        */
+
+        $job->update([
+
+            'highlight' => 1
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | INCREASE USAGE
+        |--------------------------------------------------------------------------
+        */
+
+        auth()->user()->increaseFeatureUsage(
+            'highlight_job_limit'
+        );
+
+        flashSuccess(
+            'Job highlighted successfully'
+        );
+
+        return back();
+
+    } catch (\Exception $e) {
+
+        flashError(
+            'An error occurred: '
+            . $e->getMessage()
+        );
+
+        return back();
+    }
+}
 
     /**
      * Remove the specified resource from storage.

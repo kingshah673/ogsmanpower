@@ -7,24 +7,17 @@
 @endsection
 
 @section('main')
-    <div class="dashboard-wrapper">
+    <div class="dashboard-wrapper seeker-settings-page">
         <div class="container">
-            <div class="row">
-                {{-- Sidebar --}}
-                {{-- <x-website.candidate.sidebar /> --}}
-                <div class="col-lg-9">
-                    <div class="dashboard-right">
-                        <div class="row d-flex justify-content-between p-2">
-                            <div class="col-sm-12 col-md-6">
-                                <h5 class="rt-mb-32">{{ __('job_alert') }}</h5>
-                            </div>
-                            {{-- <div class="col-sm-12 col-md-6 d-flex justify-content-end">
-                                <div class="sidebar-open-nav ml-3">
-                                    <i class="ph-list"></i>
-                                </div>
-                            </div> --}}
-                        </div>
-                        <div class="db-job-card-table">
+            <div class="dashboard-right">
+
+                <x-website.candidate.seeker-page-header
+                    :title="__('job_alert')"
+                    :subtitle="__('Notifications when new jobs match your alerts.')"
+                />
+
+                <div class="glass-card"><div class="glass-card-body">
+                <div class="db-job-card-table">
                             @if ($notifications->count() > 0)
                                 @foreach ($notifications as $noti)
                                     <div class="card jobcardStyle1 rt-mb-12">
@@ -76,12 +69,9 @@
                                 </nav>
                             @endif
                         </div>
-                    </div>
+                    </div></div>
                 </div>
             </div>
-        </div>
-        <div class="dashboard-footer text-center body-font-4 text-gray-500">
-            {{-- <x-website.footer-copyright /> --}}
         </div>
     </div>
 @endsection

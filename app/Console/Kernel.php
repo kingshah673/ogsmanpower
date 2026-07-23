@@ -30,6 +30,8 @@ class Kernel extends ConsoleKernel
         $schedule->command('jobs:updatestatus')
             ->dailyAt('13:00')->runInBackground();
         $schedule->command('update:exchange-rates')->daily();
+        $schedule->command('documents:expiry-reminder')->dailyAt('08:00');
+        $schedule->command('commissions:overdue-reminder')->dailyAt('08:30');
     }
 
     /**

@@ -2,220 +2,411 @@
 
 @section('title', __('Application Details'))
 
+@section('css')
+<link rel="stylesheet" href="{{ asset('css/company-applicants.css') }}?v={{ @filemtime(public_path('css/company-applicants.css')) ?: '1' }}">
+<link rel="stylesheet" href="{{ asset('css/company-application-detail.css') }}?v={{ @filemtime(public_path('css/company-application-detail.css')) ?: '1' }}">
+<x-map.leaflet.map_links />
+@endsection
+
 @section('main')
-<div class="container my-5">
+@php
+    $status = $candiateJob?->status ?: 'pending';
+    $locationParts = collect([
+        $candidate->exact_location,
+        $candidate->district,
+        $candidate->region,
+        $candidate->country,
+    ])->map(fn ($v) => is_string($v) ? trim($v) : null)->filter();
+    $location = $locationParts->isNotEmpty()
+        ? $locationParts->unique()->implode(', ')
+        : (filled($candidate->full_address) ? trim($candidate->full_address) : '—');
+    $mapLat = $candidate->lat ? (float) $candidate->lat : null;
+    $mapLng = $candidate->long ? (float) $candidate->long : null;
+    $mapQuery = ($location !== '—') ? $location : null;
+    $showMap = $mapLat && $mapLng || $mapQuery;
+    $age = null;
+    if (! empty($candidate->birth_date)) {
+        try {
+            $age = \Carbon\Carbon::parse($candidate->birth_date)->age;
+        } catch (\Throwable $e) {
+            $age = null;
+        }
+    }
+@endphp
 
-    <!-- ===== Candidate Header (Professional CV Style) ===== -->
-    <div class="cv-header card shadow-sm p-4 mb-5 d-flex flex-wrap align-items-start justify-content-between">
-        <!-- Photo + Info + Actions in flex -->
-        <div class="d-flex align-items-start w-100 gap-4">
+<div class="container-fluid px-3">
+    <div class="cw-ad">
+        <a href="{{ route('company.applicants') }}" class="cw-ad-back">&larr; Back to applicants</a>
 
-            <!-- Candidate Photo -->
-            <div class="position-relative">
-                <img src="{{ $candidate->photo }}" class="rounded-circle border border-3 border-primary" width="100" height="100" alt="candidate_photo">
-            </div>
+        <div class="cw-ad-hero">
+            <div class="cw-ad-hero-status status-{{ $status }}">{{ str_replace('_', ' ', $status) }}</div>
+            <div class="cw-ad-hero-body">
+                <img src="{{ $candidate->photo }}" class="cw-ad-photo" alt="{{ $candidate->user->name }}">
 
-            <!-- Candidate Info -->
-            <div class="flex-grow-1">
-                <h1 class="fw-bold">{{ $candidate->user->name }}</h1>
-                <p class="text-muted mb-1">{{ $candidate->profession ? $candidate->profession->name : '-' }}</p>
-                <p class="text-secondary small">{{ $candidate->exact_location ?? $candidate->full_address }}</p>
-
-                <div class="mt-2 d-flex gap-2 flex-wrap">
-                    <a href="{{ route('company.download.applicant.resume', ['candidate_id' => $candidate->id, 'job_id' => $candiateJob->job_id]) }}" class="btn btn-primary btn-sm">
-                        <x-svg.download-icon class="me-1"/> {{ __('Download CV') }}
-                    </a>
-                    @if ($user->contactInfo?->phone)
-                        <a href="tel:{{ $user->contactInfo->phone }}" class="btn btn-outline-secondary btn-sm">
-                            <x-svg.details-phone-call class="me-1"/> {{ __('Call') }}
-                        </a>
+                <div>
+                    <h1 class="cw-ad-name">{{ $candidate->user->name }}</h1>
+                    @if($candidate->public_code)
+                        <div class="cw-ad-code">{{ $candidate->public_code }}</div>
                     @endif
-                    @if ($user->contactInfo?->email)
-                        <a href="mailto:{{ $user->contactInfo->email }}" class="btn btn-outline-secondary btn-sm">
-                            <x-svg.details-envelop class="me-1"/> {{ __('Email') }}
-                        </a>
-                    @endif
-                   <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#forwardCandidateModal">
-                   📤 Forward CV to Email
-                    </button>
-                     
+                    <p class="cw-ad-role">{{ $candidate->profession?->name ?? __('Profession not set') }}</p>
+                    <p class="cw-ad-location">{{ $location }}</p>
+                    <div class="cw-ad-meta">
+                        <span><strong>Applied for:</strong> {{ $candiateJob?->job?->title ?? '—' }}</span>
+                        @if($candiateJob?->created_at)
+                            <span><strong>Applied:</strong> {{ $candiateJob->created_at->format('M d, Y') }}</span>
+                        @endif
+                        @if($age)
+                            <span><strong>Age:</strong> {{ $age }}</span>
+                        @endif
+                    </div>
                 </div>
 
-                <!-- Social Media -->
-                @if ($user->socialInfo && $candidate->user->socialInfo->count() > 0)
-                    <div class="d-flex gap-2 mt-2 flex-wrap">
-                        @foreach ($user->socialInfo as $contact)
-                        <a target="_blank" href="{{ $contact->url }}" class="social-icon">
-                            @switch($contact->social_media)
-                                @case('facebook') <x-svg.facebook-icon /> @break
-                                @case('twitter') <x-svg.twitter-icon /> @break
-                                @case('instagram') <x-svg.instagram-icon /> @break
-                                @case('youtube') <x-svg.youtube-icon /> @break
-                                @case('linkedin') <x-svg.linkedin-icon /> @break
-                                @case('pinterest') <x-svg.pinterest-icon /> @break
-                                @case('reddit') <x-svg.reddit-icon /> @break
-                                @case('github') <x-svg.github-icon /> @break
-                                @default <x-svg.link-icon /> 
-                            @endswitch
-                        </a>
+                <div class="cw-ad-pipeline">
+                    @if($status !== 'shortlisted' && $status !== 'interview' && $status !== 'selected')
+                        <form method="POST" action="{{ route('company.pipeline.shortlist') }}">
+                            @csrf
+                            <input type="hidden" name="candidate_id" value="{{ $candidate->id }}">
+                            <input type="hidden" name="job_id" value="{{ $candiateJob->job_id }}">
+                            <button type="submit" class="btn btn-success btn-block">Shortlist</button>
+                        </form>
+                    @endif
+
+                    @if($status !== 'interview' && $status !== 'selected' && $status !== 'rejected')
+                        <form method="POST" action="{{ route('company.pipeline.interview') }}">
+                            @csrf
+                            <input type="hidden" name="candidate_id" value="{{ $candidate->id }}">
+                            <input type="hidden" name="job_id" value="{{ $candiateJob->job_id }}">
+                            <button type="submit" class="btn btn-primary btn-block">Call for Interview</button>
+                        </form>
+                    @elseif($status === 'interview')
+                        <a href="{{ route('company.interviews') }}" class="btn btn-outline-primary btn-block">Manage Interview</a>
+                    @endif
+
+                    @if($status !== 'rejected')
+                        <form method="POST" action="{{ route('company.pipeline.reject') }}" onsubmit="return confirm('Reject this applicant?')">
+                            @csrf
+                            <input type="hidden" name="candidate_id" value="{{ $candidate->id }}">
+                            <input type="hidden" name="job_id" value="{{ $candiateJob->job_id }}">
+                            <button type="submit" class="btn btn-outline-danger btn-block">Reject</button>
+                        </form>
+                    @endif
+
+                    <button type="button" class="btn btn-outline-secondary btn-block" data-toggle="modal" data-target="#contractModal">
+                        Create Contract
+                    </button>
+                </div>
+            </div>
+
+            <div class="cw-ad-toolbar">
+                @if($candiateJob?->candidate_resume_id)
+                    <a href="{{ route('website.candidate.download.cv', $candiateJob->candidate_resume_id) }}" class="btn btn-primary btn-sm">
+                        Download uploaded CV
+                    </a>
+                @endif
+                <a href="{{ route('company.applicant.cv', ['candidate_id' => $candidate->id, 'job_id' => $candiateJob->job_id]) }}" class="btn btn-outline-primary btn-sm">
+                    {{ $candiateJob?->candidate_resume_id ? 'Generate profile CV' : 'View / Download CV' }}
+                </a>
+                @if($user->contactInfo?->phone)
+                    <a href="tel:{{ $user->contactInfo->phone }}" class="btn btn-outline-secondary btn-sm">Call</a>
+                @endif
+                @if($user->contactInfo?->email)
+                    <a href="mailto:{{ $user->contactInfo->email }}" class="btn btn-outline-secondary btn-sm">Email</a>
+                @endif
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle="modal" data-target="#forwardCandidateModal">
+                    Forward to client
+                </button>
+            </div>
+        </div>
+
+        <div class="cw-ad-layout">
+            <aside>
+                <div class="cw-ad-panel">
+                    <h2>Personal details</h2>
+                    <ul class="cw-ad-dl">
+                        <li><span>Experience</span><span>{{ $candidate->experience?->name ?? '—' }}</span></li>
+                        <li><span>Education</span><span>{{ $candidate->education?->name ?? '—' }}</span></li>
+                        <li><span>Gender</span><span>{{ $candidate->gender ? ucfirst($candidate->gender) : '—' }}</span></li>
+                        <li><span>Marital status</span><span>{{ $candidate->marital_status ? __($candidate->marital_status) : '—' }}</span></li>
+                        <li><span>Birth date</span><span>{{ $candidate->birth_date ? date('d M Y', strtotime($candidate->birth_date)) : '—' }}</span></li>
+                    </ul>
+                </div>
+
+                <div class="cw-ad-panel">
+                    <h2>Contact</h2>
+                    <ul class="cw-ad-dl">
+                        @if($user->contactInfo?->phone)
+                            <li><span>Phone</span><span>{{ $user->contactInfo->phone }}</span></li>
+                        @endif
+                        @if($user->contactInfo?->email)
+                            <li><span>Email</span><span>{{ $user->contactInfo->email }}</span></li>
+                        @endif
+                        @if($candidate->website)
+                            <li><span>Website</span><span><a href="{{ $candidate->website }}" target="_blank" rel="noopener">Visit</a></span></li>
+                        @endif
+                    </ul>
+
+                    @if($user->socialInfo && $user->socialInfo->count() > 0)
+                        <div class="cw-ad-social">
+                            @foreach($user->socialInfo as $contact)
+                                <a href="{{ $contact->url }}" target="_blank" rel="noopener" title="{{ ucfirst($contact->social_media) }}">
+                                    @switch($contact->social_media)
+                                        @case('facebook') <x-svg.facebook-icon /> @break
+                                        @case('twitter') <x-svg.twitter-icon /> @break
+                                        @case('instagram') <x-svg.instagram-icon /> @break
+                                        @case('youtube') <x-svg.youtube-icon /> @break
+                                        @case('linkedin') <x-svg.linkedin-icon /> @break
+                                        @case('pinterest') <x-svg.pinterest-icon /> @break
+                                        @case('reddit') <x-svg.reddit-icon /> @break
+                                        @case('github') <x-svg.github-icon /> @break
+                                        @default <x-svg.link-icon />
+                                    @endswitch
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </aside>
+
+            <div>
+                @if($candidate->bio)
+                    <div class="cw-ad-panel">
+                        <h2>Professional summary</h2>
+                        <p class="cw-ad-summary">{!! nl2br(e($candidate->bio)) !!}</p>
+                    </div>
+                @endif
+
+                @if($candidate->experiences->isNotEmpty())
+                    <div class="cw-ad-panel">
+                        <h2>Work experience</h2>
+                        @foreach($candidate->experiences as $exp)
+                            <div class="cw-ad-timeline-item">
+                                <strong>{{ $exp->designation ?? 'Role' }}{{ $exp->company ? ' · '.$exp->company : '' }}</strong>
+                                <span>{{ collect([$exp->start ?? null, $exp->end ?? 'Present'])->filter()->implode(' – ') }}</span>
+                            </div>
                         @endforeach
                     </div>
                 @endif
-            </div>
 
-            <!-- Action Buttons -->
-            <div class="d-flex flex-column gap-2">
-                <button class="btn btn-success btn-sm">✅ {{ __('Shortlist') }}</button>
-                <button class="btn btn-danger btn-sm">❌ {{ __('Reject') }}</button>
-                <button class="btn btn-info btn-sm">📅 {{ __('Interview') }}</button>
-                <button class="btn btn-secondary btn-sm">📝 {{ __('Notes') }}</button>
-            </div>
+                @if($candidate->educations->isNotEmpty())
+                    <div class="cw-ad-panel">
+                        <h2>Education</h2>
+                        @foreach($candidate->educations as $edu)
+                            <div class="cw-ad-timeline-item">
+                                <strong>{{ $edu->degree ?? $edu->level ?? 'Qualification' }}</strong>
+                                <span>{{ collect([$edu->level ?? null, $edu->year ?? null])->filter()->implode(' · ') }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
 
-        </div>
-    </div>
+                <div class="cw-ad-panel">
+                    <h2>Skills &amp; languages</h2>
+                    @if($candidate->skills->isNotEmpty())
+                        <h3>Skills</h3>
+                        <div class="cw-ad-tags mb-3">
+                            @foreach($candidate->skills as $skill)
+                                <span class="cw-ad-tag">{{ $skill->name }}</span>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="cw-ad-empty mb-3">No skills listed.</p>
+                    @endif
 
-    <!-- ===== About & Summary ===== -->
-    <div class="card shadow-sm p-3 mb-4 border-start border-4 border-success">
-        <h4 class="text-success mb-2">{{ __('Professional Summary') }}</h4>
-        <p>{!! nl2br($candidate->bio) !!}</p>
-    </div>
-
-    <div class="row g-4">
-        <!-- Left Column: Personal Info -->
-        <div class="col-lg-4">
-            <div class="card shadow-sm p-3 border-start border-4 border-primary">
-                <h5 class="text-primary mb-3">{{ __('Personal Details') }}</h5>
-                <ul class="list-unstyled small">
-                    <li><strong>{{ __('Experience') }}:</strong> {{ $candidate->experience?->name ?? '-' }}</li>
-                    <li><strong>{{ __('Education') }}:</strong> {{ $candidate->education?->name ?? '-' }}</li>
-                    <li><strong>{{ __('Marital Status') }}:</strong> {{ __($candidate->marital_status) }}</li>
-                    <li><strong>{{ __('Gender') }}:</strong> {{ ucfirst($candidate->gender) }}</li>
-                    <li><strong>{{ __('Birth Date') }}:</strong> {{ date('d M Y', strtotime($candidate->birth_date)) }}</li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- Right Column: Skills, Languages, Contact, Location -->
-        <div class="col-lg-8">
-            <!-- Skills & Languages -->
-            <div class="card shadow-sm p-3 mb-4 border-start border-4 border-warning">
-                <h5 class="text-warning mb-2">{{ __('Skills') }}</h5>
-                <div class="mb-3">
-                    @foreach ($candidate->skills as $skill)
-                        <span class="badge bg-info text-dark me-1 mb-1">{{ $skill->name }}</span>
-                    @endforeach
+                    @if($candidate->languages->isNotEmpty())
+                        <h3>Languages</h3>
+                        <div class="cw-ad-tags">
+                            @foreach($candidate->languages as $language)
+                                <span class="cw-ad-tag cw-ad-tag--muted">{{ $language->name }}</span>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="cw-ad-empty">No languages listed.</p>
+                    @endif
                 </div>
 
-                <h5 class="text-warning mb-2">{{ __('Languages') }}</h5>
-                <div>
-                    @foreach ($candidate->languages as $language)
-                        <span class="badge bg-secondary me-1 mb-1">{{ $language->name }}</span>
-                    @endforeach
+                <div class="cw-ad-panel">
+                    <h2>Location</h2>
+                    <p class="cw-ad-summary mb-0">{{ $location }}</p>
+                    @if($showMap)
+                        <div id="leaflet-map" class="cw-ad-map" data-lat="{{ $mapLat }}" data-lng="{{ $mapLng }}" data-query="{{ $mapQuery }}">
+                            <div class="cw-ad-map-loading text-muted small p-3">Loading map…</div>
+                        </div>
+                        @if(! $mapLat || ! $mapLng)
+                            <p class="cw-ad-map-note">Approximate location from address (candidate has not pinned exact coordinates).</p>
+                        @endif
+                    @else
+                        <p class="cw-ad-empty mt-2 mb-0">No location on file for this candidate.</p>
+                    @endif
                 </div>
-            </div>
-
-            <!-- Contact & Website -->
-            <div class="card shadow-sm p-3 mb-4 border-start border-4 border-info">
-                <h5 class="text-info mb-2">{{ __('Contact Information') }}</h5>
-                <ul class="list-unstyled small">
-                    @if ($candidate->website)
-                        <li><strong>{{ __('Website') }}:</strong> <a href="{{ $candidate->website }}" target="_blank">{{ $candidate->website }}</a></li>
-                    @endif
-                    @if ($user->contactInfo?->phone)
-                        <li><strong>{{ __('Phone') }}:</strong> {{ $user->contactInfo->phone }}</li>
-                    @endif
-                    @if ($user->contactInfo?->email)
-                        <li><strong>{{ __('Email') }}:</strong> {{ $user->contactInfo->email }}</li>
-                    @endif
-                </ul>
-            </div>
-
-            <!-- Location Map -->
-            <div class="card shadow-sm p-3 border-start border-4 border-danger">
-                <h5 class="text-danger mb-2">{{ __('Location') }}</h5>
-                <p>{{ $candidate->exact_location ?? $candidate->full_address }}</p>
-                <div id="leaflet-map" style="height: 260px;"></div>
             </div>
         </div>
     </div>
 </div>
-<!-- Forward Email Modal -->
-<!-- Forward Candidate Modal -->
-<div class="modal fade" id="forwardCandidateModal" tabindex="-1">
-<div class="modal-dialog">
-<div class="modal-content">
 
-<form action="{{ route('company.forward.candidate.email') }}" method="POST">
-@csrf
-
-<input type="hidden" name="candidate_id" value="{{ $candidate->id }}">
-<input type="hidden" name="job_id" value="{{ $candiateJob->job_id }}">
-
-<div class="modal-header">
-<h5 class="modal-title">Send Candidate to Client</h5>
-<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+{{-- Forward to client --}}
+<div class="modal fade" id="forwardCandidateModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <form action="{{ route('company.forward.candidate.email') }}" method="POST" class="modal-content">
+            @csrf
+            <input type="hidden" name="candidate_id" value="{{ $candidate->id }}">
+            <input type="hidden" name="job_id" value="{{ $candiateJob->job_id }}">
+            <div class="modal-header">
+                <h5 class="modal-title">Forward candidate to client</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Client email</label>
+                    <input type="email" name="email" class="form-control" required>
+                </div>
+                <label class="form-label font-weight-bold">Documents to include</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="docs[]" value="cv" id="docCv" checked>
+                    <label class="form-check-label" for="docCv">Candidate CV (PDF)</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="docs[]" value="photo" id="docPhoto">
+                    <label class="form-check-label" for="docPhoto">Profile picture</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="docs[]" value="passport" id="docPassport">
+                    <label class="form-check-label" for="docPassport">Passport</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="docs[]" value="video" id="docVideo">
+                    <label class="form-check-label" for="docVideo">Video introduction</label>
+                </div>
+                <div class="form-group mt-3 mb-0">
+                    <label class="form-label">Message (optional)</label>
+                    <textarea name="message" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Send</button>
+            </div>
+        </form>
+    </div>
 </div>
 
-<div class="modal-body">
-
-<div class="mb-3">
-<label class="form-label">Client Email</label>
-<input type="email" name="email" class="form-control" required>
-</div>
-
-<label><strong>Select Documents to Send</strong></label>
-
-<div class="form-check">
-<input class="form-check-input" type="checkbox" name="docs[]" value="cv" checked>
-<label class="form-check-label">Candidate CV (PDF)</label>
-</div>
-
-<div class="form-check">
-<input class="form-check-input" type="checkbox" name="docs[]" value="photo">
-<label class="form-check-label">Profile Picture</label>
-</div>
-
-<div class="form-check">
-<input class="form-check-input" type="checkbox" name="docs[]" value="passport">
-<label class="form-check-label">Passport</label>
-</div>
-
-<div class="form-check">
-<input class="form-check-input" type="checkbox" name="docs[]" value="video">
-<label class="form-check-label">Video Introduction</label>
-</div>
-
-<div class="mt-3">
-<label>Message (optional)</label>
-<textarea name="message" class="form-control"></textarea>
-</div>
-
-</div>
-
-<div class="modal-footer">
-<button class="btn btn-primary">Send Candidate</button>
-</div>
-
-</form>
-
-</div>
-</div>
+{{-- Contract --}}
+<div class="modal fade" id="contractModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <form method="POST" action="{{ route('company.contract.store') }}" class="modal-content">
+            @csrf
+            <input type="hidden" name="candidate_id" value="{{ $candidate->id }}">
+            <input type="hidden" name="job_id" value="{{ $candiateJob->job_id }}">
+            <div class="modal-header">
+                <h5 class="modal-title">Create candidate contract</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 form-group">
+                        <label class="form-label">Contract title</label>
+                        <input type="text" name="contract_title" class="form-control" required>
+                    </div>
+                    <div class="col-md-6 form-group">
+                        <label class="form-label">Salary</label>
+                        <input type="text" name="salary" class="form-control">
+                    </div>
+                    <div class="col-md-6 form-group">
+                        <label class="form-label">Duty hours</label>
+                        <input type="text" name="duty_hours" class="form-control">
+                    </div>
+                    <div class="col-md-6 form-group">
+                        <label class="form-label">Contract duration</label>
+                        <input type="text" name="contract_duration" class="form-control">
+                    </div>
+                    <div class="col-md-12 form-group">
+                        <label class="form-label">Location</label>
+                        <input type="text" name="location" class="form-control">
+                    </div>
+                    <div class="col-md-12 form-group mb-0">
+                        <label class="form-label">Contract details</label>
+                        <textarea name="contract_details" rows="5" class="form-control"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Send contract</button>
+            </div>
+        </form>
+    </div>
 </div>
 @endsection
 
-@section('style')
-<style>
-    .badge { font-size: 0.85rem; padding: 0.5em 0.7em; transition: transform 0.2s; }
-    .badge:hover { transform: scale(1.05); }
-    .social-icon svg { width: 22px; height: 22px; transition: transform 0.2s; }
-    .social-icon:hover svg { transform: scale(1.3); }
-    .card { border-radius: 12px; }
-    .cv-header h1 { font-size: 1.9rem; }
-    .cv-header .btn-sm { font-size: 0.75rem; padding: 0.3rem 0.5rem; }
-</style>
+@section('script')
+@if($showMap)
+    <x-map.leaflet.map_scripts />
+    <script>
+    (function () {
+        var el = document.getElementById('leaflet-map');
+        if (!el) return;
+
+        var lat = parseFloat(el.dataset.lat);
+        var lng = parseFloat(el.dataset.lng);
+        var query = el.dataset.query || '';
+        var hasCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+
+        function setMapMessage(msg) {
+            el.innerHTML = '<p class="cw-ad-empty p-3 mb-0">' + msg + '</p>';
+        }
+
+        function renderMap(latitude, longitude) {
+            if (typeof L === 'undefined') {
+                setMapMessage('Map library could not be loaded.');
+                return;
+            }
+            el.innerHTML = '';
+            var map = L.map(el, { scrollWheelZoom: false });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map);
+            var target = L.latLng(latitude, longitude);
+            map.setView(target, 13);
+            L.marker(target).addTo(map);
+            setTimeout(function () { map.invalidateSize(); }, 250);
+        }
+
+        if (hasCoords) {
+            renderMap(lat, lng);
+            return;
+        }
+
+        if (!query) {
+            setMapMessage('No address available to plot.');
+            return;
+        }
+
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query), {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(function (response) { return response.json(); })
+            .then(function (results) {
+                if (results && results[0]) {
+                    renderMap(parseFloat(results[0].lat), parseFloat(results[0].lon));
+                } else {
+                    setMapMessage('Could not find this address on the map.');
+                }
+            })
+            .catch(function () {
+                setMapMessage('Map could not be loaded. Check your connection and try again.');
+            });
+    })();
+    </script>
+@endif
 <script>
-document.getElementById('forwardCandidateModal').addEventListener('shown.bs.modal', function () {
-    document.querySelector('#forwardCandidateModal input[name="email"]').focus();
-});
+(function () {
+    $('#forwardCandidateModal').on('shown.bs.modal', function () {
+        $(this).find('input[name="email"]').trigger('focus');
+    });
+})();
 </script>
 @endsection

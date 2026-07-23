@@ -31,6 +31,12 @@ class BladeServiceProvider extends ServiceProvider
         Blade::if('company', function () {
             return authUser()->role == 'company';
         });
+        Blade::if('agency', function () {
+            return authUser()->role == 'agency';
+        });
+        Blade::if('agent', function () {
+            return authUser()->role == 'agent';
+        });
 
         Blade::if('currencyleft', function () {
             return config('templatecookie.currency_symbol_position') == 'left';

@@ -9,42 +9,37 @@ use Illuminate\Database\Seeder;
 
 class StateSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     *
-     * @return void
-     */
-    public function run()
+    public function run(): void
     {
         Model::unguard();
 
-        $countriesCount = State::count();
-        if (! $countriesCount) {
-            $this->makeCountry();
+        if (State::query()->exists()) {
+            return;
         }
-    }
 
-    protected function makeCountry()
-    {
-        $countries_list = json_decode(file_get_contents(base_path('resources/seed-data/states.json')), true);
+        $path = base_path('resources/seed-data/states.json');
+        if (! is_file($path)) {
+            return;
+        }
 
-        for ($i = 0; $i < count($countries_list); $i++) {
+        $list = json_decode(file_get_contents($path), true) ?: [];
+        $now = Carbon::now();
+        $rows = [];
 
-            $country_data[] = [
-                'id' => $countries_list[$i]['id'],
-                'name' => $countries_list[$i]['name'],
-                'country_id' => $countries_list[$i]['country_id'],
-                'long' => $countries_list[$i]['longitude'],
-                'lat' => $countries_list[$i]['latitude'],
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
+        foreach ($list as $item) {
+            $rows[] = [
+                'id' => $item['id'],
+                'name' => $item['name'],
+                'country_id' => $item['country_id'],
+                'long' => $item['longitude'] ?? $item['long'] ?? null,
+                'lat' => $item['latitude'] ?? $item['lat'] ?? null,
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
         }
 
-        $country_chunks = array_chunk($country_data, ceil(count($country_data) / 100));
-
-        foreach ($country_chunks as $country) {
-            State::insert($country);
+        foreach (array_chunk($rows, 500) as $chunk) {
+            State::insert($chunk);
         }
     }
 }

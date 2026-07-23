@@ -1,4 +1,4 @@
-@props(['socials'])
+@props(['socials', 'longForm' => false])
 
 <form action="{{ route('company.profile.complete', auth()->user()->id) }}" method="post">
     @method('PUT')
@@ -92,18 +92,20 @@
                 </div>
             </div>
         </div>
+        @unless($longForm)
         <a href="{{ url('company/account-progress?profile') }}">
             <button type="button" class="btn previous bg-gray-50 rt-mr-8">
                 Previous
             </button>
         </a>
-        <button type="submit" class="btn next btn-primary">
+        @endunless
+        <button type="submit" class="btn btn-primary">
             <span class="button-content-wrapper ">
                 <span class="button-icon align-icon-right">
                     <i class="ph-arrow-right"></i>
                 </span>
                 <span class="button-text">
-                    {{ __('save_next') }}
+                    {{ $longForm ? __('save') : __('save_next') }}
                 </span>
             </span>
         </button>

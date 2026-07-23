@@ -1,4 +1,4 @@
-@props(['user'])
+@props(['user', 'longForm' => false])
 
 <form action="{{ route('company.profile.complete', auth()->user()->id) }}" method="post">
     @method('PUT')
@@ -8,12 +8,12 @@
         <div class="form-card mb-4">
             <div class="dashboard-account-setting-item pb-0">
                 @if (config('templatecookie.map_show'))
-                    <h6>{{ __('company_location') }}
+                    <p class="body-font-4 d-block text-gray-900 rt-mb-8 fw-semibold">{{ __('company_location') }}
                         <span class="text-danger">*</span>
-                        <small class="h6">
+                        <small class="text-muted fw-normal">
                             ({{ __('click_to_add_a_pointer') }})
                         </small>
-                    </h6>
+                    </p>
                     <div class="row">
                         <x-website.map.map-warning />
                         @php
@@ -23,11 +23,13 @@
                             <input type="text" autocomplete="off" id="leaflet_search"
                                 placeholder="{{ __('enter_city_name') }}" class="form-control"
                                 value="{{ $user->company->exact_location ? $user->company->exact_location : $user->company->full_address }}" />
+                            <input type="hidden" name="location" value="{{ old('location', $user->company->exact_location ?: $user->company->full_address) }}">
                             <br>
                             <div id="leaflet-map"></div>
                         </div>
                         <div id="google-map-div" class="{{ $map == 'google-map' ? '' : 'd-none' }}">
                             <input id="searchInput" class="mapClass" type="text" placeholder="Enter a location">
+                            <input type="hidden" name="location" value="{{ old('location', $user->company->exact_location ?: $user->company->full_address) }}">
                             <div class="map mymap" id="google-map"></div>
                         </div>
                         @error('location')
@@ -58,7 +60,12 @@
                     <x-forms.label name="location" :required="true" class="tw-text-sm tw-mb-2" />
                     <div class="card-body pt-0 row">
                         <div class="col-12">
-                            @livewire('country-state-city')
+                            <x-website.location.country-state-city-select
+                                prefix="company_contact"
+                                :selected-country="old('country', session('selectedCountryId', $user->company->country))"
+                                :selected-state="old('state', session('selectedStateId', $user->company->region))"
+                                :selected-city="old('district', session('selectedCityId', $user->company->district))"
+                            />
                             @error('location')
                                 <span class="ml-3 text-md text-danger">{{ $message }}</span>
                             @enderror
@@ -67,7 +74,7 @@
                 @endif
             </div>
             <div class="dashboard-account-setting-item">
-                <h6>{{ __('phone_email') }}</h6>
+                <p class="body-font-4 d-block text-gray-900 rt-mb-8 fw-semibold">{{ __('phone_email') }}</p>
                 <div class="row">
                     <div class="col-lg-6 mb-3">
                         <label class="pointer body-font-4 d-block text-gray-900 rt-mb-8">
@@ -76,7 +83,8 @@
                         </label>
                         <input class="phonecode @error('phone') is-invalid border-danger @enderror" name="phone"
                             type="text" value="{{ old('phone', $user->contactInfo->phone) }}"
-                            placeholder="{{ __('phone') }}" />
+                            placeholder="{{ __('phone') }}"
+                            data-initial-country="{{ default_phone_country_iso() }}" />
                         @error('phone')
                             <span class="invalid-feedback" role="alert">
                                 <strong>{{ __($message) }}</strong>
@@ -108,18 +116,20 @@
 
             </div>
         </div>
+        @unless($longForm)
         <a href="{{ url('company/account-progress?social') }}">
             <button type="button" class="btn previous bg-gray-50 rt-mr-8">
                 {{ __('previous') }}
             </button>
         </a>
-        <button type="submit" class="btn next btn-primary hide-menu-btn">
+        @endunless
+        <button type="submit" class="btn btn-primary">
             <span class="button-content-wrapper ">
                 <span class="button-icon align-icon-right">
                     <i class="ph-arrow-right"></i>
                 </span>
                 <span class="button-text">
-                    {{ __('save_next') }}
+                    {{ $longForm ? __('Complete setup') : __('save_next') }}
                 </span>
             </span>
         </button>

@@ -13,7 +13,9 @@ use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use App\Services\DynamicFieldService;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class CompanySettingUpdateService
 {
@@ -22,8 +24,16 @@ class CompanySettingUpdateService
      */
     public function update($request): mixed
     {
-        $user = User::findOrFail(auth()->id());
+        $user = authUser();
+
+        if (! $user) {
+            abort(401);
+        }
         $request->session()->put('type', $request->type);
+
+        if ($request->has('dynamic_inputs') && is_array($request->input('dynamic_inputs')) && $user->company) {
+            DynamicFieldService::saveEmployerFieldValues($user->company, $request->input('dynamic_inputs'));
+        }
 
         if ($request->type == 'personal') {
             $this->personalUpdate($request, $user);
@@ -132,46 +142,61 @@ class CompanySettingUpdateService
 
     public function personalUpdate($request, $user): bool
     {
+        $nameRules = ['required', 'string', 'max:255'];
+
+        $submittedName = trim((string) $request->input('name', ''));
+        $currentName = trim((string) $user->name);
+
+        if (strcasecmp($submittedName, $currentName) !== 0) {
+            $nameRules[] = Rule::unique('users', 'name')
+                ->where(fn ($query) => $query->where('role', 'company'))
+                ->ignore($user->id);
+        }
+
         $request->validate([
-            'name' => 'required|unique:users,name,'.auth()->id(),
+            'name' => $nameRules,
         ]);
 
-        $company = Company::where('user_id', auth()->id())->first();
+        $company = Company::where('user_id', $user->id)->first();
+        $imageMimes = 'jpeg,png,jpg,gif,webp,jfif,bmp';
 
-        if ($request->image) {
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
             $request->validate([
-                'image' => 'required|image|mimes:jpeg,png,jpg,gif',
+                'image' => 'required|image|mimes:'.$imageMimes.'|max:5120',
             ]);
 
             deleteImage($user->company->logo);
-            $path = 'uploads/images/company'; // Relative path within the public directory
-            $image = uploadImage($request->image, $path, [68, 68]);
+            $image = uploadImage($request->file('image'), 'uploads/images/company', [68, 68]);
 
-            // Assuming that $user->company->logo holds the relative path to the logo
             if ($company) {
-                // deleteImage($user->company->logo); // Delete the old logo
                 $company->update(['logo' => $image]);
             }
         }
 
-        if ($request->banner) {
+        if ($request->hasFile('banner') && $request->file('banner')->isValid()) {
             $request->validate([
-                'banner' => 'required|image|mimes:jpeg,png,jpg,gif',
+                'banner' => 'required|image|mimes:'.$imageMimes.'|max:5120',
             ]);
 
             deleteImage($user->company->banner);
-            $path = 'uploads/images/company';
-            $banner = uploadImage($request->banner, $path, [1920, 312]);
+            $banner = uploadImage($request->file('banner'), 'uploads/images/company', [1920, 312]);
 
             if ($company) {
                 $company->update(['banner' => $banner]);
             }
         }
 
-        $user->update([
-            'name' => $request->name,
-            'username' => Str::slug($request->name),
-        ]);
+        $userData = ['name' => $request->name];
+
+        if ($request->name !== $user->name) {
+            $username = Str::slug($request->name) ?: 'company-'.$user->id;
+            while (User::where('username', $username)->where('id', '!=', $user->id)->exists()) {
+                $username = Str::slug($request->name).'-'.uniqid();
+            }
+            $userData['username'] = $username;
+        }
+
+        $user->update($userData);
 
         if ($company) {
             $company->update(['bio' => $request->about_us]);
@@ -297,6 +322,15 @@ class CompanySettingUpdateService
                 'email' => $request->email,
             ]);
         }
+
+        if (empty(config('templatecookie.map_show')) && $request->filled('country')) {
+            seedLocationSessionFromNames(
+                $request->input('country'),
+                $request->input('state'),
+                $request->input('district')
+            );
+        }
+
         // =========== Location ===========
         updateMap(auth()->user()->company);
 
