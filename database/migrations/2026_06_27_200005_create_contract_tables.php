@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -21,37 +20,27 @@ return new class extends Migration
             });
         }
 
-        // Shared hosts often already have a legacy `contracts` table whose `id`
-        // is INT (signed) / different engine — FK to bigint then fails (errno 150).
-        $canFk = $this->contractsIdSupportsBigintFk();
-
+        // No DB-level FKs: production may already have a legacy `contracts`
+        // table (engine/type mismatch → errno 150). App enforces relations.
         if (! Schema::hasTable('contract_parties')) {
-            Schema::create('contract_parties', function (Blueprint $table) use ($canFk) {
+            Schema::create('contract_parties', function (Blueprint $table) {
                 $table->id();
-                $table->unsignedBigInteger('contract_id');
-                $table->unsignedBigInteger('user_id');
+                $table->unsignedBigInteger('contract_id')->index();
+                $table->unsignedBigInteger('user_id')->index();
                 $table->string('role');
                 $table->boolean('is_signed')->default(false);
                 $table->timestamps();
-                $table->index('contract_id');
-                if ($canFk) {
-                    $table->foreign('contract_id')->references('id')->on('contracts')->cascadeOnDelete();
-                }
             });
         }
 
         if (! Schema::hasTable('contract_signatures')) {
-            Schema::create('contract_signatures', function (Blueprint $table) use ($canFk) {
+            Schema::create('contract_signatures', function (Blueprint $table) {
                 $table->id();
-                $table->unsignedBigInteger('contract_id');
-                $table->unsignedBigInteger('user_id');
+                $table->unsignedBigInteger('contract_id')->index();
+                $table->unsignedBigInteger('user_id')->index();
                 $table->string('otp')->nullable();
                 $table->timestamp('verified_at')->nullable();
                 $table->timestamps();
-                $table->index('contract_id');
-                if ($canFk) {
-                    $table->foreign('contract_id')->references('id')->on('contracts')->cascadeOnDelete();
-                }
             });
         }
 
@@ -74,30 +63,5 @@ return new class extends Migration
         Schema::dropIfExists('contract_parties');
         Schema::dropIfExists('contract_templates');
         Schema::dropIfExists('contracts');
-    }
-
-    private function contractsIdSupportsBigintFk(): bool
-    {
-        if (! Schema::hasTable('contracts')) {
-            return false;
-        }
-
-        $row = DB::selectOne(
-            'SELECT DATA_TYPE AS data_type, COLUMN_TYPE AS column_type
-             FROM information_schema.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = ?
-               AND COLUMN_NAME = ?',
-            ['contracts', 'id']
-        );
-
-        if (! $row) {
-            return false;
-        }
-
-        $columnType = strtolower((string) ($row->column_type ?? ''));
-
-        // Laravel $table->id() => bigint unsigned
-        return str_contains($columnType, 'bigint') && str_contains($columnType, 'unsigned');
     }
 };
