@@ -960,7 +960,51 @@ class WebsiteController extends Controller
             $companies = Company::count();
             $candidates = Candidate::count();
 
-            return view('frontend.pages.about', compact('testimonials', 'companies', 'candidates'));
+            $aboutHero = null;
+            $aboutStory = null;
+            $aboutCeo = null;
+            $aboutFeatures = collect();
+            $aboutMetrics = collect();
+            $aboutIndustries = collect();
+            $aboutOffices = collect();
+            $aboutVideos = collect();
+            $aboutSocials = collect();
+            $aboutConfig = collect();
+
+            $cacheFor = function (string $key, string $table, \Closure $query) {
+                if (! \Illuminate\Support\Facades\Schema::hasTable($table)) {
+                    return null;
+                }
+
+                return \Illuminate\Support\Facades\Cache::remember($key, 600, $query);
+            };
+
+            $aboutHero = $cacheFor('about_page_hero', 'about_hero', fn () => \Illuminate\Support\Facades\DB::table('about_hero')->orderByDesc('is_active')->first());
+            $aboutStory = $cacheFor('about_page_story', 'about_story', fn () => \Illuminate\Support\Facades\DB::table('about_story')->orderByDesc('is_active')->first());
+            $aboutCeo = $cacheFor('about_page_ceo', 'about_ceo', fn () => \Illuminate\Support\Facades\DB::table('about_ceo')->orderByDesc('is_active')->first());
+            $aboutFeatures = $cacheFor('about_page_features', 'about_features', fn () => \Illuminate\Support\Facades\DB::table('about_features')->where('is_active', 1)->orderBy('sort_order')->get()) ?? collect();
+            $aboutMetrics = $cacheFor('about_page_metrics', 'about_metrics', fn () => \Illuminate\Support\Facades\DB::table('about_metrics')->where('is_active', 1)->orderBy('sort_order')->get()) ?? collect();
+            $aboutIndustries = $cacheFor('about_page_industries', 'about_industries', fn () => \Illuminate\Support\Facades\DB::table('about_industries')->where('is_active', 1)->orderBy('sort_order')->get()) ?? collect();
+            $aboutOffices = $cacheFor('about_page_offices', 'about_offices', fn () => \Illuminate\Support\Facades\DB::table('about_offices')->where('is_active', 1)->orderBy('sort_order')->get()) ?? collect();
+            $aboutVideos = $cacheFor('about_page_videos', 'about_videos', fn () => \Illuminate\Support\Facades\DB::table('about_videos')->where('is_active', 1)->orderBy('sort_order')->get()) ?? collect();
+            $aboutSocials = $cacheFor('about_page_socials', 'about_social_links', fn () => \Illuminate\Support\Facades\DB::table('about_social_links')->where('is_active', 1)->orderBy('sort_order')->get()) ?? collect();
+            $aboutConfig = $cacheFor('about_page_config', 'about_config', fn () => \Illuminate\Support\Facades\DB::table('about_config')->pluck('cfg_value', 'cfg_key')) ?? collect();
+
+            return view('frontend.pages.about', compact(
+                'testimonials',
+                'companies',
+                'candidates',
+                'aboutHero',
+                'aboutStory',
+                'aboutCeo',
+                'aboutFeatures',
+                'aboutMetrics',
+                'aboutIndustries',
+                'aboutOffices',
+                'aboutVideos',
+                'aboutSocials',
+                'aboutConfig'
+            ));
         } catch (\Exception $e) {
             flashError('An error occurred: ' . $e->getMessage());
 

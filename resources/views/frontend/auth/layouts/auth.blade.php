@@ -97,6 +97,8 @@
         @include('frontend.partials.footer')
     @endif
 
+    @include('frontend.partials.lead-floats')
+
    
     <!-- PWA Button Start -->
     {{-- <button class="pwa-install-btn bg-white position-fixed d-none" id="installApp">

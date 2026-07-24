@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Auth;
 
 // Controllers
 use App\Http\Controllers\Website\WebsiteController;
+use App\Http\Controllers\Website\LeadFloatController;
 use App\Http\Controllers\Website\CompanyController;
 use App\Http\Controllers\Website\AgencyController as WebsiteAgencyController;
 use App\Http\Controllers\Admin\AgencyController as AdminAgencyController;
@@ -125,6 +126,7 @@ Route::controller(SocialLoginController::class)->group(function () {
 */
 // Original OGS About page (not CareerWorkforce AboutPageController)
 Route::get('/about', [WebsiteController::class, 'about'])->name('website.about');
+Route::post('/leads/track', [LeadFloatController::class, 'track'])->name('website.leads.track');
 
 // Legacy alias for company/agency application "Download CV" links
 Route::get('/downloadCv/{resume}', [WebsiteController::class, 'candidateDownloadCv'])

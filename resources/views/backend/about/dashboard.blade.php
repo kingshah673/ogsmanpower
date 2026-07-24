@@ -351,15 +351,101 @@ textarea.form-input{min-height:100px;resize:vertical;}
             <div class="form-group"><label>Register URL</label><input type="text" name="config[register_url]" class="form-input" value="{{ $config['register_url'] ?? '/register' }}"></div>
             <div class="form-group"><label>Google Analytics ID</label><input type="text" name="config[google_analytics_id]" class="form-input" value="{{ $config['google_analytics_id'] ?? '' }}" placeholder="G-XXXXXXXXXX"></div>
             <div class="form-group fg-full"><label>Footer Copyright Text</label><input type="text" name="config[footer_copyright]" class="form-input" value="{{ $config['footer_copyright'] ?? '' }}"></div>
+
+            <div class="form-group fg-full"><hr style="border:none;border-top:1px solid #E5E7EB;margin:.5rem 0;"><strong>About page section titles</strong></div>
+            <div class="form-group"><label>Features label</label><input type="text" name="config[features_label]" class="form-input" value="{{ $config['features_label'] ?? 'Why Choose OGS' }}"></div>
+            <div class="form-group"><label>Features title</label><input type="text" name="config[features_title]" class="form-input" value="{{ $config['features_title'] ?? 'Why Employers Trust OGS' }}"></div>
+            <div class="form-group fg-full"><label>Features intro</label><input type="text" name="config[features_intro]" class="form-input" value="{{ $config['features_intro'] ?? 'Click any card below to explore our strengths in detail.' }}"></div>
+            <div class="form-group"><label>Journey title</label><input type="text" name="config[journey_title]" class="form-input" value="{{ $config['journey_title'] ?? 'OGS Journey' }}"></div>
+            <div class="form-group"><label>Global presence title</label><input type="text" name="config[global_title]" class="form-input" value="{{ $config['global_title'] ?? 'Our Global Presence' }}"></div>
+            <div class="form-group"><label>Portal title</label><input type="text" name="config[portal_title]" class="form-input" value="{{ $config['portal_title'] ?? 'Our Candidate Portal' }}"></div>
+            <div class="form-group"><label>Portal subtitle</label><input type="text" name="config[portal_subtitle]" class="form-input" value="{{ $config['portal_subtitle'] ?? 'Find Pre-Screened Candidates Instantly' }}"></div>
+            <div class="form-group fg-full"><label>Portal bullets (one per line)</label><textarea name="config[portal_bullets]" class="form-input" rows="3">{{ $config['portal_bullets'] ?? "Search & Filter Profiles\nVerified CVs\nVideo Interviews" }}</textarea></div>
+            <div class="form-group"><label>Portal button text</label><input type="text" name="config[portal_btn_text]" class="form-input" value="{{ $config['portal_btn_text'] ?? 'Explore Candidates' }}"></div>
+            <div class="form-group"><label>Portal button URL</label><input type="text" name="config[portal_btn_url]" class="form-input" value="{{ $config['portal_btn_url'] ?? '/candidates' }}"></div>
+            <div class="form-group"><label>Industries title</label><input type="text" name="config[industries_title]" class="form-input" value="{{ $config['industries_title'] ?? 'Industries We Serve' }}"></div>
+            <div class="form-group"><label>Connect title</label><input type="text" name="config[connect_title]" class="form-input" value="{{ $config['connect_title'] ?? 'Connect With OGS Manpower' }}"></div>
+            <div class="form-group fg-full"><label>Connect subtitle</label><input type="text" name="config[connect_subtitle]" class="form-input" value="{{ $config['connect_subtitle'] ?? 'Follow OGS across our channels for updates, opportunities, and community news.' }}"></div>
+            <div class="form-group"><label>Join CTA title</label><input type="text" name="config[join_title]" class="form-input" value="{{ $config['join_title'] ?? 'Join OGS Manpower' }}"></div>
+            <div class="form-group fg-full"><label>Join CTA text</label><input type="text" name="config[join_text]" class="form-input" value="{{ $config['join_text'] ?? 'Create your account as a job seeker or employer and get started in minutes.' }}"></div>
           </div>
           <button type="submit" class="save-btn">💾 Save Configuration</button>
         </form>
       </div>
     </div>
 
-    <!-- Placeholder tabs -->
-    <div class="tab-content" id="tab-story"><div class="admin-card"><h2>Story Section — Edit in full via Story tab</h2><p style="color:#6B7280;font-size:.88rem;">Full story editor loaded here — all fields same pattern as Hero tab above.</p></div></div>
-    <div class="tab-content" id="tab-industries"><div class="admin-card"><h2>Industries</h2><p style="color:#6B7280;font-size:.88rem;">Industry CRUD follows same pattern as features table above.</p></div></div>
+    <!-- ── STORY TAB ── -->
+    <div class="tab-content" id="tab-story">
+      <div class="admin-card">
+        <h2>Our Story Section</h2>
+        <form method="POST" action="{{ route('admin.about.story.update') }}">
+          @csrf
+          <div class="form-grid">
+            <div class="form-group"><label>Section Label</label><input type="text" name="section_label" class="form-input" value="{{ $story->section_label ?? '' }}" placeholder="Our Story"></div>
+            <div class="form-group"><label>License Text</label><input type="text" name="license_text" class="form-input" value="{{ $story->license_text ?? '' }}" placeholder="License No. 2978/RWP"></div>
+            <div class="form-group fg-full"><label>Headline</label><input type="text" name="headline" class="form-input" value="{{ $story->headline ?? '' }}"></div>
+            <div class="form-group fg-full"><label>Quote</label><textarea name="quote" class="form-input" rows="2">{{ $story->quote ?? '' }}</textarea></div>
+            <div class="form-group fg-full"><label>Body Paragraph 1</label><textarea name="body_1" class="form-input" rows="4">{{ $story->body_1 ?? '' }}</textarea></div>
+            <div class="form-group fg-full"><label>Body Paragraph 2</label><textarea name="body_2" class="form-input" rows="4">{{ $story->body_2 ?? '' }}</textarea></div>
+            <div class="form-group fg-full"><label>Body Paragraph 3</label><textarea name="body_3" class="form-input" rows="4">{{ $story->body_3 ?? '' }}</textarea></div>
+            <div class="form-group fg-full"><label>Mission block (one line per bullet, shown under “Our mission is to”)</label><textarea name="mission" class="form-input" rows="5" placeholder="Build long-term partnerships with employers&#10;Deliver reliable and skilled manpower solutions">{{ $story->mission ?? '' }}</textarea></div>
+            <div class="form-group"><label>Card 1 Number</label><input type="text" name="card_1_num" class="form-input" value="{{ $story->card_1_num ?? '' }}"></div>
+            <div class="form-group"><label>Card 1 Label</label><input type="text" name="card_1_lbl" class="form-input" value="{{ $story->card_1_lbl ?? '' }}"></div>
+            <div class="form-group fg-full"><label>Card 1 Description</label><input type="text" name="card_1_desc" class="form-input" value="{{ $story->card_1_desc ?? '' }}"></div>
+            <div class="form-group"><label>Card 2 Number</label><input type="text" name="card_2_num" class="form-input" value="{{ $story->card_2_num ?? '' }}"></div>
+            <div class="form-group"><label>Card 2 Label</label><input type="text" name="card_2_lbl" class="form-input" value="{{ $story->card_2_lbl ?? '' }}"></div>
+            <div class="form-group fg-full"><label>Card 2 Description</label><input type="text" name="card_2_desc" class="form-input" value="{{ $story->card_2_desc ?? '' }}"></div>
+          </div>
+          <button type="submit" class="save-btn">💾 Save Story</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── INDUSTRIES TAB ── -->
+    <div class="tab-content" id="tab-industries">
+      <div class="admin-card">
+        <h2>Industries</h2>
+        <p style="font-size:.8rem;color:#6B7280;margin-bottom:1rem;">Upload an icon image for each industry, edit the name, then click Save. Set Active to No to hide it on the site.</p>
+        @forelse(($industries ?? collect()) as $ind)
+          @php
+            $iconVal = (string) ($ind->icon ?? '');
+            $iconIsImage = $iconVal !== '' && (str_contains($iconVal, '/') || preg_match('/\.(png|jpe?g|webp|svg)$/i', $iconVal));
+            $iconSrc = $iconIsImage
+                ? (str_starts_with($iconVal, 'http') ? $iconVal : asset(ltrim($iconVal, '/')))
+                : null;
+          @endphp
+          <form method="POST" action="{{ route('admin.about.industries.update', $ind->id) }}" enctype="multipart/form-data" class="form-grid" style="border-bottom:1px solid #F3F4F6;padding-bottom:.8rem;margin-bottom:.8rem;align-items:end;">
+            @csrf
+            @method('PUT')
+            <div class="form-group">
+              <label>Icon</label>
+              <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem;">
+                @if ($iconSrc)
+                  <img src="{{ $iconSrc }}" alt="{{ $ind->name }}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;background:#F3F4F6;">
+                @elseif ($iconVal !== '')
+                  <span style="font-size:1.8rem;line-height:1;">{{ $iconVal }}</span>
+                @else
+                  <span style="font-size:.75rem;color:#9CA3AF;">No icon</span>
+                @endif
+              </div>
+              <input type="file" name="icon_file" class="form-input" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+              <small style="color:#6B7280;">Upload a PNG/JPG to replace the current icon.</small>
+            </div>
+            <div class="form-group"><label>Name</label><input type="text" name="name" class="form-input" value="{{ $ind->name }}" required></div>
+            <div class="form-group"><label>Description</label><input type="text" name="description" class="form-input" value="{{ $ind->description }}"></div>
+            <div class="form-group"><label>Active</label>
+              <select name="is_active" class="form-input">
+                <option value="1" {{ $ind->is_active ? 'selected' : '' }}>Yes</option>
+                <option value="0" {{ !$ind->is_active ? 'selected' : '' }}>No</option>
+              </select>
+            </div>
+            <div class="form-group"><button type="submit" class="save-btn" style="padding:.55rem 1.2rem;">Save</button></div>
+          </form>
+        @empty
+          <p style="color:#6B7280;">No industries found. Run <code>php artisan db:seed --class=AboutPageSeeder</code>.</p>
+        @endforelse
+      </div>
+    </div>
 
   </div><!-- /content -->
 </div><!-- /main -->
@@ -393,11 +479,14 @@ textarea.form-input{min-height:100px;resize:vertical;}
 <script>
 function showTab(name){
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name)?.classList.add('active');
-  event.currentTarget?.classList.add('active');
-  document.querySelectorAll('.sb-link').forEach(l=>l.classList.remove('active'));
-  event.currentTarget?.classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(function(b){
+    b.classList.toggle('active', (b.getAttribute('onclick')||'').indexOf("'"+name+"'") !== -1);
+  });
+  document.querySelectorAll('.sb-link').forEach(function(l){
+    var onclick = l.getAttribute('onclick') || '';
+    l.classList.toggle('active', onclick.indexOf("'"+name+"'") !== -1);
+  });
 }
 function openEditFeature(f){
   document.getElementById('editFeatureForm').action='/admin/about/features/'+f.id;

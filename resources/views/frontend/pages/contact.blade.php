@@ -31,17 +31,19 @@
                         <i class="fas fa-envelope"></i>
                         <div>
                             <strong>Email</strong>
-                            <p>{{ $setting->email }}</p>
+                            <p><a href="mailto:{{ $setting->email }}" style="color:inherit;">{{ $setting->email }}</a></p>
                         </div>
                     </div>
 
+                    @if (!empty($cms_setting?->footer_phone_no))
                     <div class="info-item">
                         <i class="fas fa-phone"></i>
                         <div>
                             <strong>Phone</strong>
-                            <p>+92 300 5352636</p>
+                            <p><a href="tel:{{ $cms_setting->footer_phone_no }}" style="color:inherit;">{{ $cms_setting->footer_phone_no }}</a></p>
                         </div>
                     </div>
+                    @endif
 
                     <div class="info-item">
                         <i class="fas fa-map-marker-alt"></i>
@@ -99,11 +101,6 @@
 <section>
     <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3321.998148535668!2d73.06661688230514!3d33.63129000452174!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x38df94db951a9af1%3A0x23ca33751eb280e!2sOGS%20MANPOWER%20(%20Licence%20No%202978Recruitment%20Agency%20)!5e0!3m2!1sen!2s!4v1773968044542!5m2!1sen!2s" width="100%" height="350" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
 </section>
-
-{{-- FLOATING WHATSAPP --}}
-<a href="https://wa.me/923005352636" class="whatsapp-float" target="_blank">
-    <i class="fab fa-whatsapp"></i>
-</a>
 
 @endsection
 
@@ -195,19 +192,6 @@
 
 textarea.form-control {
     height: auto;
-}
-
-/* WHATSAPP */
-.whatsapp-float {
-    position: fixed;
-    bottom: 25px;
-    right: 25px;
-    background: #25D366;
-    color: #fff;
-    font-size: 22px;
-    padding: 15px;
-    border-radius: 50%;
-    z-index: 999;
 }
 
 </style>

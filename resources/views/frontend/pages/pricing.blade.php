@@ -320,14 +320,16 @@
                     class="tw-w-full tw-rounded-lg tw-flex tw-flex-col tw-gap-3 tw-p-4 tw-shadow-[0px_0px_32px_0px_rgba(0,0,0,0.12)] tw-bg-white">
                     <h4 class="tw-text-xl">{{ __('connect_with_us') }}</h4>
                     <div class="tw-flex tw-flex-wrap tw-h-auto tw-gap-4 tw-items-center tw-min-h-[38px]">
-                        <a href="tel:{{ $cms_setting?->footer_phone_no }}"
+                        @if (!empty($cms_setting?->footer_phone_no))
+                        <a href="tel:{{ $cms_setting->footer_phone_no }}"
                             class="tw-inline-flex tw-text-base tw-font-medium tw-text-primary-500 hover:tw-text-primary-700 tw-gap-1.5 tw-items-center">
                             <span
                                 class="tw-text-base tw-inline-flex tw-justify-center tw-items-center tw-bg-[#D7E9E9] tw-p-2 tw-rounded-full"><i
                                     class="ph-phone"></i></span>
-                            <span>{{ $cms_setting?->footer_phone_no ?? '' }} </span>
+                            <span>{{ $cms_setting->footer_phone_no }} </span>
                         </a>
-                        <a href=""
+                        @endif
+                        <a href="mailto:{{ $setting->email ?? '' }}"
                             class="tw-inline-flex tw-text-base tw-font-medium tw-text-primary-500 hover:tw-text-primary-700 tw-gap-1.5 tw-items-center">
                             <span
                                 class="tw-text-base tw-inline-flex tw-justify-center tw-items-center tw-bg-[#D7E9E9] tw-p-2 tw-rounded-full"><i

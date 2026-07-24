@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="@yield('description')">
     <meta property="og:image" content="@yield('og:image')">
     <title>@yield('title') - {{ config('app.name') }}</title>
@@ -46,6 +47,8 @@
 
     {{-- footer --}}
     @include('frontend.partials.footer')
+
+    @include('frontend.partials.lead-floats')
 
     <!-- scripts -->
     @include('frontend.partials.public-scripts')

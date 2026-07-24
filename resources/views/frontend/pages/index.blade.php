@@ -436,6 +436,19 @@ Post a Job
 {{ $job->country }}
 </p>
 
+<p class="small text-muted mb-0">
+<i class="fas fa-money-bill-wave"></i>
+{{ __('salary') }}:
+@if ($job->salary_mode == 'range')
+{{ currencyAmountShort($job->min_salary,1) }}
+-
+{{ currencyAmountShort($job->max_salary,1) }}
+{{ $job->currency }}
+@else
+{{ $job->custom_salary }}
+@endif
+</p>
+
 </div>
 
 </a>

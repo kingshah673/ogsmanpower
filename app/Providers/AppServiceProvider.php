@@ -97,7 +97,7 @@ class AppServiceProvider extends ServiceProvider
                 return loadSetting();
             });
             
-            View::composer('partials.footer', function ($view) {
+            View::composer('frontend.partials.footer', function ($view) {
 
     $panels = Cache::rememberForever('footer_panels', function () {
 

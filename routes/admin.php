@@ -634,20 +634,19 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/hr-templates/edit/{id}', [ContractTemplateController::class, 'edit'])->name('hrtemplates.edit');
     Route::post('/hr-templates/update/{id}', [ContractTemplateController::class, 'update'])->name('hrtemplates.update');
     Route::delete('/hr-templates/delete/{id}', [ContractTemplateController::class, 'destroy'])->name('hrtemplates.delete');
-    // Footer manager screen
-    Route::get('footer', [FooterPanelController::class, 'index'])->name('footer.index');
-// Panels
-    Route::post('footer/panels', [FooterPanelController::class, 'store'])->name('footer.panels.store');
-    Route::put('footer/panels/{panel}', [FooterPanelController::class, 'update'])->name('footer.panels.update');
-    Route::delete('footer/panels/{panel}', [FooterPanelController::class, 'destroy'])->name('footer.panels.destroy');
-    Route::post('footer/panels/reorder', [FooterPanelController::class, 'reorder'])->name('footer.panels.reorder');
-// Items
-    Route::post('footer/items', [FooterItemController::class, 'store'])->name('footer.items.store');
-    Route::put('footer/items/{item}', [FooterItemController::class, 'update'])->name('footer.items.update');
-     Route::delete('footer/items/{item}', [FooterItemController::class, 'destroy'])->name('footer.items.destroy');
-    Route::post('footer/items/reorder', [FooterItemController::class, 'reorder'])->name('footer.items.reorder');
-    
-    
+    // Footer CMS (must use auth:admin — parent name group already prefixes admin.)
+    Route::middleware(['auth:admin', 'otp.verified'])->prefix('footer')->name('footer.')->group(function () {
+        Route::get('/', [FooterPanelController::class, 'index'])->name('index');
+        Route::put('/settings', [FooterPanelController::class, 'updateSettings'])->name('settings.update');
+        Route::post('/panels', [FooterPanelController::class, 'store'])->name('panels.store');
+        Route::put('/panels/{panel}', [FooterPanelController::class, 'update'])->name('panels.update');
+        Route::delete('/panels/{panel}', [FooterPanelController::class, 'destroy'])->name('panels.destroy');
+        Route::post('/panels/reorder', [FooterPanelController::class, 'reorder'])->name('panels.reorder');
+        Route::post('/items', [FooterItemController::class, 'store'])->name('items.store');
+        Route::put('/items/{item}', [FooterItemController::class, 'update'])->name('items.update');
+        Route::delete('/items/{item}', [FooterItemController::class, 'destroy'])->name('items.destroy');
+        Route::post('/items/reorder', [FooterItemController::class, 'reorder'])->name('items.reorder');
+    });
 
             });
     Route::middleware(['auth:admin', 'otp.verified'])->group(function () {

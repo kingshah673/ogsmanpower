@@ -7,62 +7,78 @@ use App\Models\FooterPanel;
 use Illuminate\Database\Seeder;
 
 /**
- * Optional: gives you 4 ready-made panels so you can see the footer
- * straight away. Run with:  php artisan db:seed --class=FooterSeeder
+ * Seeds OGS-style footer panels. Safe to re-run only when empty.
+ * php artisan db:seed --class=FooterSeeder
  */
 class FooterSeeder extends Seeder
 {
     public function run(): void
     {
+        if (FooterPanel::query()->exists()) {
+            $this->command?->info('Footer panels already exist — skipping FooterSeeder.');
+            return;
+        }
+
         $panels = [
             [
-                'title' => 'About Us',
+                'title' => 'Top Links',
                 'items' => [
-                    ['type' => 'text', 'content' => 'We build great products and help our customers succeed every single day.'],
-                    ['type' => 'link', 'label' => 'Our Story', 'url' => '/about'],
-                    ['type' => 'link', 'label' => 'Careers',   'url' => '/careers'],
+                    ['type' => 'link', 'label' => 'Faq', 'url' => '/faq'],
+                    ['type' => 'link', 'label' => 'Privacy', 'url' => '/privacy-policy'],
+                    ['type' => 'link', 'label' => 'Contact Us', 'url' => '/contact'],
+                    ['type' => 'link', 'label' => 'About', 'url' => '/about'],
                 ],
             ],
             [
-                'title' => 'Quick Links',
+                'title' => 'Jobs By Industry',
                 'items' => [
-                    ['type' => 'link', 'label' => 'Home',     'url' => '/'],
-                    ['type' => 'link', 'label' => 'Services', 'url' => '/services'],
-                    ['type' => 'link', 'label' => 'Pricing',  'url' => '/pricing'],
-                    ['type' => 'link', 'label' => 'Blog',     'url' => '/blog'],
+                    ['type' => 'link', 'label' => 'Drilling Oil & Gas', 'url' => '/jobs'],
+                    ['type' => 'link', 'label' => 'Information Technology', 'url' => '/jobs'],
+                    ['type' => 'link', 'label' => 'Accounts, Finance and Business', 'url' => '/jobs'],
+                    ['type' => 'link', 'label' => 'Engineering & Technology', 'url' => '/jobs'],
+                    ['type' => 'link', 'label' => 'Construction Consultants', 'url' => '/jobs'],
                 ],
             ],
             [
-                'title' => 'Support',
+                'title' => 'Jobs By Location',
                 'items' => [
-                    ['type' => 'link', 'label' => 'Help Center', 'url' => '/help'],
-                    ['type' => 'link', 'label' => 'Contact',     'url' => '/contact'],
-                    ['type' => 'link', 'label' => 'FAQ',         'url' => '/faq'],
-                    ['type' => 'link', 'label' => 'Privacy Policy', 'url' => '/privacy'],
+                    ['type' => 'link', 'label' => 'Pakistan', 'url' => '/jobs'],
+                    ['type' => 'link', 'label' => 'Saudi Arabia', 'url' => '/jobs'],
+                    ['type' => 'link', 'label' => 'Australia', 'url' => '/jobs'],
+                    ['type' => 'link', 'label' => 'USA', 'url' => '/jobs'],
+                    ['type' => 'link', 'label' => 'UK', 'url' => '/jobs'],
                 ],
             ],
             [
-                'title' => 'Get In Touch',
+                'title' => 'Job Seekers',
                 'items' => [
-                    ['type' => 'heading', 'label' => 'Head Office'],
-                    ['type' => 'text', 'content' => "123 Example Street\nCity, Country"],
-                    ['type' => 'text', 'content' => 'hello@example.com'],
+                    ['type' => 'link', 'label' => 'Search job', 'url' => '/jobs'],
+                    ['type' => 'link', 'label' => 'Create Account', 'url' => '/register?type=seeker'],
+                    ['type' => 'link', 'label' => 'Recent Jobs', 'url' => '/jobs'],
+                ],
+            ],
+            [
+                'title' => 'Employers',
+                'items' => [
+                    ['type' => 'link', 'label' => 'Register as Employer', 'url' => '/register?type=employer'],
+                    ['type' => 'link', 'label' => 'Post Job', 'url' => '/company/create/job'],
+                    ['type' => 'link', 'label' => 'Search Resume', 'url' => '/candidates'],
                 ],
             ],
         ];
 
         foreach ($panels as $panelOrder => $panelData) {
             $panel = FooterPanel::create([
-                'title'      => $panelData['title'],
+                'title' => $panelData['title'],
                 'sort_order' => $panelOrder,
-                'is_active'  => true,
+                'is_active' => true,
             ]);
 
             foreach ($panelData['items'] as $itemOrder => $item) {
                 FooterItem::create(array_merge([
                     'footer_panel_id' => $panel->id,
-                    'sort_order'      => $itemOrder,
-                    'is_active'       => true,
+                    'sort_order' => $itemOrder,
+                    'is_active' => true,
                 ], $item));
             }
         }

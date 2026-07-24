@@ -231,6 +231,11 @@
                             {{ $job->jobtitle ?? 'No Title' }}
                         </span>
                     </div>
+                    <div class="tw-flex tw-gap-2 tw-items-center">
+                        <span class="tw-text-sm tw-text-[#767F8C]">
+                            {{ __('salary') }}: {{ $job->salary ?? __('negotiable') }}
+                        </span>
+                    </div>
                 </div>
                 <div class="rt-single-icon-box tw-flex-wrap tw-gap-4">
                     <div class="iconbox-content">

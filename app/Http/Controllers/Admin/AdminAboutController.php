@@ -83,7 +83,12 @@ class AdminAboutController extends Controller
             'stat_3_val'  => 'nullable|max:20',
             'stat_3_lbl'  => 'nullable|max:80',
         ]);
-        DB::table('about_hero')->where('id', 1)->update($validated);
+        $validated['updated_at'] = now();
+        if (DB::table('about_hero')->where('id', 1)->exists()) {
+            DB::table('about_hero')->where('id', 1)->update($validated);
+        } else {
+            DB::table('about_hero')->insert($validated + ['id' => 1, 'is_active' => 1]);
+        }
         $this->clearCache();
         return back()->with('success', 'Hero section updated successfully!');
     }
@@ -91,12 +96,18 @@ class AdminAboutController extends Controller
     // ── STORY ────────────────────────────────────────────────
     public function updateStory(Request $request)
     {
+        if (! $this->tablesReady() || ! Schema::hasTable('about_story')) {
+            return $this->setupRequiredResponse();
+        }
+
         $validated = $request->validate([
+            'section_label'=> 'nullable|max:200',
             'headline'     => 'required|max:300',
             'quote'        => 'nullable',
             'body_1'       => 'nullable',
             'body_2'       => 'nullable',
             'body_3'       => 'nullable',
+            'mission'      => 'nullable',
             'license_text' => 'nullable|max:200',
             'card_1_num'   => 'nullable|max:20',
             'card_1_lbl'   => 'nullable|max:100',
@@ -105,7 +116,18 @@ class AdminAboutController extends Controller
             'card_2_lbl'   => 'nullable|max:100',
             'card_2_desc'  => 'nullable|max:300',
         ]);
-        DB::table('about_story')->where('id', 1)->update($validated);
+        $validated['updated_at'] = now();
+
+        if (! Schema::hasColumn('about_story', 'mission')) {
+            unset($validated['mission']);
+        }
+
+        if (DB::table('about_story')->where('id', 1)->exists()) {
+            DB::table('about_story')->where('id', 1)->update($validated);
+        } else {
+            DB::table('about_story')->insert($validated + ['id' => 1, 'is_active' => 1]);
+        }
+
         $this->clearCache();
         return back()->with('success', 'Story section updated!');
     }
@@ -162,7 +184,8 @@ class AdminAboutController extends Controller
                 'value'      => $data['value'] ?? '',
                 'label'      => $data['label'] ?? '',
                 'icon'       => $data['icon']  ?? '📊',
-                'is_active'  => isset($data['is_active']) ? 1 : 0,
+                'is_active'  => (int) ($data['is_active'] ?? 0),
+                'updated_at' => now(),
             ]);
         }
         $this->clearCache();
@@ -172,12 +195,26 @@ class AdminAboutController extends Controller
     // ── INDUSTRIES ───────────────────────────────────────────
     public function updateIndustry(Request $request, int $id)
     {
+        if (! Schema::hasTable('about_industries')) {
+            return $this->setupRequiredResponse();
+        }
+
         $validated = $request->validate([
-            'icon'        => 'required|max:20',
             'name'        => 'required|max:100',
             'description' => 'nullable|max:300',
-            'is_active'   => 'boolean',
+            'is_active'   => 'nullable|in:0,1',
+            'icon_file'   => 'nullable|image|mimes:png,jpg,jpeg,webp,svg|max:2048',
         ]);
+        $validated['is_active'] = (int) ($validated['is_active'] ?? 0);
+        $validated['updated_at'] = now();
+
+        if ($request->hasFile('icon_file')) {
+            $path = $request->file('icon_file')->store('about/industries', 'public');
+            $validated['icon'] = '/storage/' . $path;
+        }
+
+        unset($validated['icon_file']);
+
         DB::table('about_industries')->where('id', $id)->update($validated);
         $this->clearCache();
         return back()->with('success', 'Industry updated!');
@@ -252,7 +289,8 @@ class AdminAboutController extends Controller
         foreach ($links as $id => $data) {
             DB::table('about_social_links')->where('id', $id)->update([
                 'url'       => $data['url'] ?? '#',
-                'is_active' => isset($data['is_active']) ? 1 : 0,
+                'is_active' => (int) ($data['is_active'] ?? 0),
+                'updated_at'=> now(),
             ]);
         }
         $this->clearCache();
@@ -264,9 +302,10 @@ class AdminAboutController extends Controller
     {
         $config = $request->input('config', []);
         foreach ($config as $key => $value) {
-            DB::table('about_config')
-              ->where('cfg_key', $key)
-              ->update(['cfg_value' => $value]);
+            DB::table('about_config')->updateOrInsert(
+                ['cfg_key' => $key],
+                ['cfg_value' => $value, 'updated_at' => now()]
+            );
         }
         $this->clearCache();
         return back()->with('success', 'Configuration saved!');
@@ -275,7 +314,21 @@ class AdminAboutController extends Controller
     // ── CACHE CLEAR ──────────────────────────────────────────
     private function clearCache(): void
     {
-        Cache::forget('about_page_data');
+        foreach ([
+            'about_page_data',
+            'about_page_hero',
+            'about_page_story',
+            'about_page_ceo',
+            'about_page_features',
+            'about_page_metrics',
+            'about_page_industries',
+            'about_page_offices',
+            'about_page_videos',
+            'about_page_socials',
+            'about_page_config',
+        ] as $key) {
+            Cache::forget($key);
+        }
     }
 
     public function clearCacheManual()

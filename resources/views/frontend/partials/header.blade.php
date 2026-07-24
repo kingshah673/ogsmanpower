@@ -401,10 +401,10 @@
                                 style="padding: 10px 10px 10px;line-height: 8px;font-size: 10px;">
                                 {{ __('sign_in') }}
                             </a>
-                            <a href="javascript:void(0)" class="btn btn-primary btn-sm"
+                            <a href="javascript:void(0)" class="btn btn-success btn-sm d-md-none"
                                     style="padding:10px; font-size:12px;"
                                         data-bs-toggle="modal" data-bs-target="#registerTypeModal">
-                                        {{ __('sign_up') }}
+                                        {{ __('register') }}
                                         </a>
                             
                         @endif
@@ -589,7 +589,7 @@
                                     </ul>
                                     <div class="tw-mb-post-job">
                                         <a href="{{ route('company.job.create') }}">
-                                            <button class="btn btn-primary">
+                                            <button class="btn btn-danger">
                                                 {{ __('post_job') }}
                                             </button>
                                         </a>
@@ -1070,7 +1070,7 @@
                                         class="btn btn-primary d-inline-block">{{ __('login') }}</a>
                                 </li>
                                 <li>
-                                    <a href="javascript:void(0)" class="btn btn-primary btn-sm"
+                                    <a href="javascript:void(0)" class="btn btn-success btn-sm"
                                     style="padding:10px; font-size:12px;"
                                         data-bs-toggle="modal" data-bs-target="#registerTypeModal">
                                         {{ __('register') }}
@@ -1079,7 +1079,7 @@
                                 </li>
                                 <li>
                                     <a href="{{ route('company.job.create') }}"
-                                        class="btn btn-primary d-inline-block">{{ __('post_job') }}</a>
+                                        class="btn btn-danger d-inline-block">{{ __('post_job') }}</a>
                                 </li>
                             </ul>
 
@@ -1090,13 +1090,13 @@
                                     style="padding: 10px 10px 10px; line-height: 8px; font-size: 10px;">
                                     {{ __('login') }}
                                 </a>
-                                <a href="javascript:void(0)" class="btn btn-primary btn-sm"
+                                <a href="javascript:void(0)" class="btn btn-success btn-sm"
                                     style="padding:10px; font-size:12px;"
                                         data-bs-toggle="modal" data-bs-target="#registerTypeModal">
                                         {{ __('register') }}
                                         </a>
 
-                                <a href="{{ route('company.job.create') }}" class="btn btn-primary btn-sm"
+                                <a href="{{ route('company.job.create') }}" class="btn btn-danger btn-sm"
                                     style="padding: 10px 10px 10px; line-height: 8px; font-size: 10px;">
                                     {{ __('post_job') }}
                                 </a>
@@ -1615,10 +1615,10 @@
                                 style="padding: 10px 10px 10px;line-height: 8px;font-size: 10px;">
                                 {{ __('sign_in') }}
                             </a>
-                            <a href="javascript:void(0)" class="btn btn-primary btn-sm"
+                            <a href="javascript:void(0)" class="btn btn-success btn-sm d-md-none"
                                     style="padding:10px; font-size:12px;"
                                         data-bs-toggle="modal" data-bs-target="#registerTypeModal">
-                                        {{ __('sign_up') }}
+                                        {{ __('register') }}
                                         </a>
                             
                         @endif
@@ -1804,7 +1804,7 @@
                                     </ul>
                                     <div class="tw-mb-post-job">
                                         <a href="{{ route('company.job.create') }}">
-                                            <button class="btn btn-primary">
+                                            <button class="btn btn-danger">
                                                 {{ __('post_job') }}
                                             </button>
                                         </a>
@@ -2285,7 +2285,7 @@
                                         class="btn btn-primary d-inline-block">{{ __('login') }}</a>
                                 </li>
                                 <li>
-                                    <a href="javascript:void(0)" class="btn btn-primary btn-sm"
+                                    <a href="javascript:void(0)" class="btn btn-success btn-sm"
                                     style="padding:10px; font-size:12px;"
                                         data-bs-toggle="modal" data-bs-target="#registerTypeModal">
                                         {{ __('register') }}
@@ -2293,7 +2293,7 @@
                                 </li>
                                 <li>
                                     <a href="{{ route('company.job.create') }}"
-                                        class="btn btn-primary d-inline-block">{{ __('post_job') }}</a>
+                                        class="btn btn-danger d-inline-block">{{ __('post_job') }}</a>
                                 </li>
                             </ul>
 
@@ -2304,13 +2304,13 @@
                                     style="padding: 10px 10px 10px; line-height: 8px; font-size: 10px;">
                                     {{ __('login') }}
                                 </a>
-                                <a href="javascript:void(0)" class="btn btn-primary btn-sm"
+                                <a href="javascript:void(0)" class="btn btn-success btn-sm"
                                     style="padding:10px; font-size:12px;"
                                         data-bs-toggle="modal" data-bs-target="#registerTypeModal">
                                         {{ __('register') }}
                                         </a>
 
-                                <a href="{{ route('company.job.create') }}" class="btn btn-primary btn-sm"
+                                <a href="{{ route('company.job.create') }}" class="btn btn-danger btn-sm"
                                     style="padding: 10px 10px 10px; line-height: 8px; font-size: 10px;">
                                     {{ __('post_job') }}
                                 </a>

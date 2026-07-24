@@ -536,6 +536,14 @@
                         </a>
                     </li>
                     @if (userCan('setting.view'))
+                        <x-admin.sidebar-list :linkActive="Route::is('admin.footer.*') ? true : false" route="admin.footer.index" path="admin.footer.index"
+                            plus_icon="" icon="fas fa-shoe-prints">
+                            Footer CMS
+                        </x-admin.sidebar-list>
+                        <x-admin.sidebar-list :linkActive="request()->is('admin/about*') ? true : false" route="admin.about.dashboard" path="admin.about.dashboard"
+                            plus_icon="" icon="fas fa-info-circle">
+                            About CMS
+                        </x-admin.sidebar-list>
                         <x-admin.sidebar-list :linkActive="request()->is('admin/settings/*') ? true : false" route="settings.general" path="settings.general"
                             plus_icon="" icon="fas fa-cog">
                             {{ __('settings') }}
